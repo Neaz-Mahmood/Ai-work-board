@@ -1,0 +1,138 @@
+:root {
+  --color-bg: #FFFFFF;
+  --color-surface: #F7F8F9;
+  --color-column: #F1F2F4;
+  --color-text: #172B4D;
+  --color-text-subtle: #626F86;
+  --color-border: #DCDFE4;
+  --color-brand: #0C66E4;
+  --color-brand-hover: #0055CC;
+  --color-brand-subtle: #E9F2FF;
+  --color-danger: #C9372C;
+  --color-danger-hover: #AE2A19;
+  --color-danger-subtle: #FFECEB;
+  --color-hover: #091e420f;
+  --color-active: #091e4224;
+
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-size-base: 14px;
+  --font-size-sm: 12px;
+  --font-size-xs: 11px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --sidebar-width: 240px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  width: 100%;
+}
+
+button {
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button-primary {
+  background-color: var(--color-brand);
+  color: #FFFFFF;
+}
+
+.button-primary:hover:not(:disabled) {
+  background-color: var(--color-brand-hover);
+}
+
+.button-secondary {
+  background-color: var(--color-hover);
+  color: var(--color-text);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background-color: var(--color-active);
+}
+
+.button-danger {
+  background-color: var(--color-danger);
+  color: #FFFFFF;
+}
+
+.button-danger:hover:not(:disabled) {
+  background-color: var(--color-danger-hover);
+}
+
+.button-subtle {
+  background-color: transparent;
+  color: var(--color-text-subtle);
+}
+
+.button-subtle:hover:not(:disabled) {
+  background-color: var(--color-hover);
+  color: var(--color-text);
+}
+
+input[type="text"],
+input[type="search"],
+textarea,
+select {
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  background-color: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 1px var(--color-brand);
+}
+
+a {
+  color: var(--color-brand);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}

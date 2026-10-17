@@ -1,0 +1,3 @@
+# The board is the source of truth; agents write to it via MCP and CLI, not pipeline files
+
+Agents create and move Tickets by calling the board's MCP server or CLI; the board owns the data. We deliberately do not watch or sync grill-and-build pipeline folders (`.cursor/feature-pipeline/*/plan.md`, `task-NN.md`) — not in v1 and not planned — even though those files describe the same work. A file mirror would be read-only, tie the board to one pipeline's file format, and make board edits diverge from the files; an explicit agent interface works for any agent (Claude Code, Cursor, agy) and keeps one writer model.

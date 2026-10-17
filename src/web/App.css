@@ -1,0 +1,64 @@
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-bg);
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: auto;
+  position: relative;
+}
+
+.app-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-base);
+}
+
+.not-found-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px;
+  text-align: center;
+}
+
+.not-found-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.not-found-message {
+  font-size: var(--font-size-base);
+  color: var(--color-text-subtle);
+  margin: 0;
+}
+
+.not-found-link {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 8px 16px;
+  background-color: var(--color-hover);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+.not-found-link:hover {
+  background-color: var(--color-active);
+  text-decoration: none;
+}

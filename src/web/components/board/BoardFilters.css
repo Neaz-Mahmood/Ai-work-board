@@ -1,0 +1,116 @@
+.board-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.board-filter-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.board-filter-search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--color-text-subtle, #626F86);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-filter-search-input {
+  padding: 6px 10px 6px 28px;
+  font-size: var(--font-size-sm, 13px);
+  border: 1px solid var(--color-border, #091E4224);
+  border-radius: var(--radius-sm, 3px);
+  outline: none;
+  background-color: var(--color-surface, #FFFFFF);
+  color: var(--color-text, #172B4D);
+  width: 160px;
+  transition: border-color 0.15s ease, width 0.2s ease, box-shadow 0.15s ease;
+}
+
+.board-filter-search-input:focus {
+  border-color: var(--color-brand, #0C66E4);
+  box-shadow: 0 0 0 1px var(--color-brand, #0C66E4);
+  width: 200px;
+}
+
+.board-filter-assignees {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-avatar-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.filter-avatar-btn:hover {
+  transform: scale(1.08);
+}
+
+.filter-avatar-btn.selected {
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px var(--color-brand, #0C66E4);
+}
+
+.unassigned-avatar {
+  background-color: var(--color-surface, #F1F2F4);
+  color: var(--color-text-subtle, #626F86);
+  border: 1px dashed var(--color-border, #091E424F);
+  box-sizing: border-box;
+}
+
+.board-filter-features {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-feature-chip {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm, 3px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.15s ease, outline 0.15s ease;
+}
+
+.filter-feature-chip:hover {
+  opacity: 0.85;
+}
+
+.filter-feature-chip.selected {
+  outline: 2px solid var(--color-brand, #0C66E4);
+  outline-offset: 1px;
+}
+
+.board-filters-clear-btn {
+  background: none;
+  border: none;
+  color: var(--color-brand, #0C66E4);
+  font-size: var(--font-size-sm, 12px);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 6px;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.board-filters-clear-btn:hover {
+  color: var(--color-brand-hover, #0055CC);
+}
