@@ -11,7 +11,7 @@ describe("Tickets REST API", () => {
   let repoB: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-tickets-test-"));
     repoA = path.join(tempBase, "repo-a");
     repoB = path.join(tempBase, "repo-b");
@@ -31,8 +31,8 @@ describe("Tickets REST API", () => {
     });
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
 

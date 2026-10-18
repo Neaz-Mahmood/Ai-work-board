@@ -56,13 +56,13 @@ describe("MCP projects endpoint", () => {
   let testApp: TestApp;
   let tempBase: string;
 
-  beforeAll(() => {
-    testApp = makeTestApp();
-    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-mcp-test-"));
+  beforeAll(async () => {
+    testApp = await makeTestApp();
+    tempBase = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "awb-mcp-test-")));
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
 
@@ -156,12 +156,69 @@ describe("MCP projects endpoint", () => {
       expect(invalidKey.isError).toBe(true);
       expect(invalidKey.data).toMatch(/^VALIDATION: Project key must be 2 to 5 uppercase letters/);
 
-      // Non-existent path -> VALIDATION
-      const nonExistent = await callTool(client, "create_project", {
-        path: path.join(tempBase, "does-not-exist"),
+      // Relative path -> VALIDATION
+      const relPath = await callTool(client, "create_project", {
+        path: "./relative/path",
       });
-      expect(nonExistent.isError).toBe(true);
-      expect(nonExistent.data).toMatch(/^VALIDATION: Path does not exist/);
+      expect(relPath.isError).toBe(true);
+      expect(relPath.data).toMatch(/^VALIDATION: Project path must be absolute/);
+
+      // Non-existent path -> accepted
+      const nonExistent = await callTool(client, "create_project", {
+        path: path.join(tempBase, "mcp-does-not-exist"),
+        key: "NOEXT",
+        name: "No Exist Project",
+      });
+      expect(nonExistent.isError).toBe(false);
+      expect(nonExistent.data.key).toBe("NOEXT");
+      expect(nonExistent.data.path).toBe(path.join(tempBase, "mcp-does-not-exist"));
+
+      // Trailing slashes normalized and duplicate rejected -> CONFLICT
+      const trailPath = path.join(tempBase, "mcp-trail");
+      const createTrail = await callTool(client, "create_project", {
+        path: trailPath + "///",
+        key: "TRL",
+      });
+      expect(createTrail.isError).toBe(false);
+      expect(createTrail.data.path).toBe(trailPath);
+
+      const dupTrail = await callTool(client, "create_project", {
+        path: trailPath,
+      });
+      expect(dupTrail.isError).toBe(true);
+      expect(dupTrail.data).toMatch(/^CONFLICT: Path already registered as TRL/);
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("MCP cwd lookup picks deepest Project containing it", async () => {
+    const client = await connectMcp(testApp.app);
+    try {
+      const parentPath = "/virtual/mcp-tree";
+      const childPath = "/virtual/mcp-tree/nested-app";
+      await callTool(client, "create_project", {
+        path: parentPath,
+        key: "MPAR",
+      });
+      await callTool(client, "create_project", {
+        path: childPath,
+        key: "MCHD",
+      });
+
+      // Resolving with cwd inside child should pick MCHD
+      const boardRes = await callTool(client, "get_board", {
+        cwd: "/virtual/mcp-tree/nested-app/src",
+      });
+      expect(boardRes.isError).toBe(false);
+      expect(boardRes.data.project.key).toBe("MCHD");
+
+      // Resolving with cwd inside parent (outside child) should pick MPAR
+      const boardResParent = await callTool(client, "get_board", {
+        cwd: "/virtual/mcp-tree/docs",
+      });
+      expect(boardResParent.isError).toBe(false);
+      expect(boardResParent.data.project.key).toBe("MPAR");
     } finally {
       await client.close();
     }
@@ -220,7 +277,7 @@ describe("MCP projects endpoint", () => {
 
   test("MCP client can connect over real HTTP server", async () => {
     const testServer: TestServer = await startTestServer();
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-net-test-"));
+    const tempDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "awb-net-test-")));
     try {
       const client = new Client({ name: "real-net-client", version: "1.0.0" });
       const transport = new StreamableHTTPClientTransport(

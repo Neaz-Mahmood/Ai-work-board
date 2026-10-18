@@ -21,7 +21,7 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
   const dataDir = (values["data-dir"] as string | undefined) ?? defaultDataDir(io.env);
   const staticDir = fileURLToPath(new URL("../../../dist/web", import.meta.url));
 
-  const appInstance = createApp({ dataDir, staticDir });
+  const appInstance = await createApp({ dataDir, staticDir });
 
   const server = serve({
     fetch: appInstance.app.fetch,
@@ -39,7 +39,7 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
     };
 
     server.on("error", (err: unknown) => {
-      appInstance.close();
+      void appInstance.close();
       const code = (err as { code?: string })?.code;
       if (code === "EADDRINUSE") {
         io.stderr(`Port ${port} is in use. Use --port or AWB_PORT.\n`);

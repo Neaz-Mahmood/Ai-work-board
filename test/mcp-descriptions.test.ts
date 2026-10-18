@@ -49,12 +49,12 @@ const EXPECTED_CLI_COMMANDS = [
 describe("MCP tool descriptions and documentation consistency", () => {
   let testApp: TestApp;
 
-  beforeAll(() => {
-    testApp = makeTestApp();
+  beforeAll(async () => {
+    testApp = await makeTestApp();
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
   });
 
   test("every listed tool exists, has a description of at least 40 characters, and every input property has a description", async () => {

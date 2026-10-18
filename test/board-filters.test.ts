@@ -12,7 +12,7 @@ describe("Board and Tickets search and quick filters", () => {
   let featBetaId: number;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-board-filters-test-"));
     repoPath = path.join(tempBase, "repo-bf");
     fs.mkdirSync(repoPath, { recursive: true });
@@ -80,8 +80,8 @@ describe("Board and Tickets search and quick filters", () => {
     });
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
 

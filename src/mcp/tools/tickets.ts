@@ -27,7 +27,7 @@ export function registerTicketTools(
     "Retrieve the complete kanban board for a project, including all five workflow columns, ticket cards, features, and actors.",
     {
       project: z.string().optional().describe("Optional project key. If omitted, the project is resolved from cwd or the nearest registered parent directory"),
-      cwd: z.string().optional().describe("Optional repository directory path used to resolve the project when project key is omitted (deepest match wins)"),
+      cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
     },
     async (args) => {
       return withToolResult(() => {
@@ -42,7 +42,7 @@ export function registerTicketTools(
     "Query and filter ticket cards on a project board by column (backlog, todo, in_progress, in_review, done), assignee, search text, or feature.",
     {
       project: z.string().optional().describe("Optional project key. If omitted, the project is resolved from cwd or the nearest registered parent directory"),
-      cwd: z.string().optional().describe("Optional repository directory path used to resolve the project when project key is omitted (deepest match wins)"),
+      cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
       column: z.string().optional().describe("Optional column filter: 'backlog', 'todo', 'in_progress', 'in_review', or 'done'"),
       assignee: z.string().optional().describe("Optional assignee actor name to filter tickets by ownership"),
       query: z.string().optional().describe("Optional search query matching against ticket key, title, or description"),
@@ -79,7 +79,7 @@ export function registerTicketTools(
     "Create a new ticket on a project board. Tickets land in Backlog by default for the user to review and move to To Do.",
     {
       project: z.string().optional().describe("Optional project key. If omitted, the project is resolved from cwd or the nearest registered parent directory"),
-      cwd: z.string().optional().describe("Optional repository directory path used to resolve the project when project key is omitted (deepest match wins)"),
+      cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
       title: z.string().describe("Ticket title summary (1-200 characters)"),
       description: z.string().optional().describe("Optional markdown description detailing requirements, implementation steps, or acceptance criteria"),
       column: z.string().optional().describe("Optional target column (default: 'backlog'). The user moves approved tickets to 'todo'"),
@@ -236,7 +236,7 @@ export function registerTicketTools(
     "Start work: atomically takes the top-ranked unblocked, unassigned To Do Ticket, assigns it to you and moves it to In Progress. Returns {ticket: null} when nothing is available.",
     {
       project: z.string().optional().describe("Optional project key. If omitted, the project is resolved from cwd or the nearest registered parent directory"),
-      cwd: z.string().optional().describe("Optional repository directory path used to resolve the project when project key is omitted (deepest match wins)"),
+      cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
       featureId: z.number().int().optional().describe("Optional feature ID to restrict claims to tickets under a specific feature"),
       actor: z.string().optional().describe("Optional actor name claiming the ticket (e.g. agent name; 'you' is reserved for UI)"),
     },

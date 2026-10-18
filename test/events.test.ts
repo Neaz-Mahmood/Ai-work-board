@@ -12,7 +12,7 @@ describe("Live updates (SSE) events", () => {
   let repoDirOther: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-events-test-"));
     repoDirAwb = path.join(tempBase, "awb-repo");
     repoDirOther = path.join(tempBase, "other-repo");
@@ -32,8 +32,8 @@ describe("Live updates (SSE) events", () => {
     });
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
 
@@ -166,7 +166,7 @@ describe("Live updates (SSE) events", () => {
   });
 
   test("heartbeat ping arrives with sseHeartbeatMs: 50", async () => {
-    const pingApp = makeTestApp({ sseHeartbeatMs: 50 });
+    const pingApp = await makeTestApp({ sseHeartbeatMs: 50 });
     try {
       const sseRes = await pingApp.app.request("/api/events?project=AWB");
       expect(sseRes.status).toBe(200);
@@ -176,7 +176,7 @@ describe("Live updates (SSE) events", () => {
       expect(events[0].comment).toBe("ping");
       expect(events[0].raw).toContain(": ping");
     } finally {
-      pingApp.close();
+      await pingApp.close();
     }
   });
 

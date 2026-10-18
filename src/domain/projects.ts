@@ -1,28 +1,17 @@
-import fs from "node:fs";
 import path from "node:path";
 import type { Ctx } from "./context.ts";
 import type { ColumnId, Project } from "../shared/types.ts";
 import { DomainError, validation, notFound, conflict } from "../server/errors.ts";
 
 export function normalizeProjectPath(p: string): string {
-  if (!p || typeof p !== "string") {
-    throw validation("Path must be absolute");
+  if (!p || typeof p !== "string" || !path.isAbsolute(p)) {
+    throw validation("Project path must be absolute");
   }
-  if (!path.isAbsolute(p)) {
-    throw validation("Path must be absolute");
+  let norm = path.normalize(p);
+  while (norm.length > 1 && norm.endsWith("/")) {
+    norm = norm.slice(0, -1);
   }
-  if (!fs.existsSync(p)) {
-    throw validation(`Path does not exist: ${p}`);
-  }
-  const stat = fs.statSync(p);
-  if (!stat.isDirectory()) {
-    throw validation(`Path is not a directory: ${p}`);
-  }
-  let real = fs.realpathSync(p);
-  if (real.length > 1 && (real.endsWith("/") || real.endsWith("\\"))) {
-    real = real.replace(/[/\\]+$/, "");
-  }
-  return real;
+  return norm;
 }
 
 export function deriveKey(folderName: string, existingKeys: Set<string>): string {
@@ -298,20 +287,13 @@ export function resolveProject(
     throw validation("Either key or cwd is required to resolve project");
   }
 
-  let resolvedCwd = params.cwd;
-  if (fs.existsSync(params.cwd)) {
-    resolvedCwd = fs.realpathSync(params.cwd);
-  }
-  if (resolvedCwd.length > 1 && (resolvedCwd.endsWith("/") || resolvedCwd.endsWith("\\"))) {
-    resolvedCwd = resolvedCwd.replace(/[/\\]+$/, "");
-  }
+  const normalizedCwd = normalizeProjectPath(params.cwd);
 
   const projects = listProjects(ctx);
   const matching = projects.filter((p) => {
     return (
-      resolvedCwd === p.path ||
-      resolvedCwd.startsWith(p.path + path.sep) ||
-      resolvedCwd.startsWith(p.path + "/")
+      p.path === normalizedCwd ||
+      (p.path === "/" ? normalizedCwd.startsWith("/") : normalizedCwd.startsWith(p.path + "/"))
     );
   });
 

@@ -20,9 +20,9 @@ describe("Needs Attention - Domain, REST, MCP, CLI, and UI mappings", () => {
   let serverRepoDir: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     server = await startTestServer();
-    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-attention-test-"));
+    tempBase = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "awb-attention-test-")));
     appRepoDir = path.join(tempBase, "app-repo");
     fs.mkdirSync(appRepoDir, { recursive: true });
     serverRepoDir = path.join(tempBase, "server-repo");
@@ -44,7 +44,7 @@ describe("Needs Attention - Domain, REST, MCP, CLI, and UI mappings", () => {
   });
 
   afterAll(async () => {
-    testApp.close();
+    await testApp.close();
     await server.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });

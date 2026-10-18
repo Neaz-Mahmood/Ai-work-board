@@ -30,12 +30,12 @@ export type TestApp = {
     body?: unknown,
     actor?: string
   ): Promise<{ status: number; body: any }>;
-  close(): void;
+  close(): Promise<void>;
 };
 
-export function makeTestApp(opts?: Partial<AppOptions>): TestApp {
+export async function makeTestApp(opts?: Partial<AppOptions>): Promise<TestApp> {
   const dataDir = opts?.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "awb-test-"));
-  const created = createApp({
+  const created = await createApp({
     dataDir,
     clock: fixedClock(),
     ...opts,
@@ -78,8 +78,8 @@ export function makeTestApp(opts?: Partial<AppOptions>): TestApp {
     };
   };
 
-  const close = () => {
-    created.close();
+  const close = async (): Promise<void> => {
+    await created.close();
     fs.rmSync(dataDir, { recursive: true, force: true });
   };
 
@@ -105,7 +105,7 @@ export type TestServer = {
 };
 
 export async function startTestServer(): Promise<TestServer> {
-  const testApp = makeTestApp();
+  const testApp = await makeTestApp();
   const server = serve({
     fetch: testApp.app.fetch,
     port: 0,
@@ -128,7 +128,7 @@ export async function startTestServer(): Promise<TestServer> {
         else resolve();
       });
     });
-    testApp.close();
+    await testApp.close();
   };
 
   return {

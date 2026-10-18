@@ -22,7 +22,7 @@ export function registerProjectTools(
     "create_project",
     "Register a repository directory as a new project on the AI Work Board to begin tracking boards, tickets, and features.",
     {
-      path: z.string().describe("Absolute path to the repository directory to register as a project"),
+      path: z.string().describe("Absolute, symlink-resolved path of the repository on the agent's machine"),
       name: z.string().optional().describe("Optional display name for the project (defaults to directory name if omitted)"),
       key: z.string().optional().describe("Optional project key of 2-5 uppercase letters (derived from directory name if omitted)"),
       actor: z.string().optional().describe("Optional actor name performing this action (e.g. agent name; 'you' is reserved for UI)"),

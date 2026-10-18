@@ -12,7 +12,7 @@ describe("Ticket Deletion and Detail tests", () => {
   let repoDir: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     server = await startTestServer();
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-delete-test-"));
     repoDir = path.join(tempBase, "del-repo");
@@ -32,7 +32,7 @@ describe("Ticket Deletion and Detail tests", () => {
   });
 
   afterAll(async () => {
-    testApp.close();
+    await testApp.close();
     await server.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });

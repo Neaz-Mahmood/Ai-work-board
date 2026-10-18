@@ -4,8 +4,7 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Clock } from "./clock.ts";
 import { systemClock } from "./clock.ts";
-import type { Db } from "./db.ts";
-import { openDb } from "./db.ts";
+import { openSqlite } from "./db.ts";
 import { migrate } from "./migrations.ts";
 import { DomainError } from "./errors.ts";
 import type { Ctx } from "../domain/context.ts";
@@ -24,15 +23,15 @@ export type AppOptions = {
   sseHeartbeatMs?: number;
 };
 
-export function createApp(opts: AppOptions): { app: Hono; ctx: Ctx; close(): void } {
+export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx; close(): Promise<void> }> {
   fs.mkdirSync(opts.dataDir, { recursive: true });
   const dbFile = path.join(opts.dataDir, "board.db");
-  const db = openDb(dbFile);
+  const { db, adb, close: closeDb } = openSqlite(dbFile);
   migrate(db);
 
   const clock = opts.clock ?? systemClock;
   const events = new EventBus();
-  const ctx: Ctx = { db, clock, events };
+  const ctx: Ctx = { db, adb, clock, events };
 
   const app = new Hono();
 
@@ -89,8 +88,8 @@ export function createApp(opts: AppOptions): { app: Hono; ctx: Ctx; close(): voi
   return {
     app,
     ctx,
-    close(): void {
-      db.close();
+    async close(): Promise<void> {
+      closeDb();
     },
   };
 }

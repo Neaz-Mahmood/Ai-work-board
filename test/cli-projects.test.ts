@@ -10,7 +10,7 @@ describe("CLI Projects commands", () => {
 
   beforeAll(async () => {
     server = await startTestServer();
-    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-cli-test-"));
+    tempBase = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "awb-cli-test-")));
   });
 
   afterAll(async () => {
@@ -145,5 +145,51 @@ describe("CLI Projects commands", () => {
       cwd: tempBase,
     });
     expect(listRes.stdout).toContain(`CUST  Custom Project  ${realTargetDir}`);
+  });
+
+  test("awb init in a directory reached through a symlink registers the real path", async () => {
+    const realDir = path.join(tempBase, "symlink-target-repo");
+    fs.mkdirSync(realDir, { recursive: true });
+    const symlinkDir = path.join(tempBase, "symlink-alias-repo");
+    fs.symlinkSync(realDir, symlinkDir);
+
+    const initRes = await runCli(["init", "--key", "SYM", "--name", "Symlink Repo"], {
+      url: server.url,
+      cwd: symlinkDir,
+    });
+    expect(initRes.code).toBe(0);
+    const realCanonical = fs.realpathSync(realDir);
+    expect(initRes.stdout).toBe(`Registered SYM (Symlink Repo) at ${realCanonical}\n`);
+
+    // Verify projects list has the real path, not the symlink path
+    const listRes = await runCli(["projects", "--json"], {
+      url: server.url,
+      cwd: tempBase,
+    });
+    const parsedList = JSON.parse(listRes.stdout);
+    const symProj = parsedList.find((p: any) => p.key === "SYM");
+    expect(symProj).toBeDefined();
+    expect(symProj.path).toBe(realCanonical);
+  });
+
+  test("awb init on a missing directory exits 2 with an error", async () => {
+    const missingDir = path.join(tempBase, "completely-missing-dir");
+    const res = await runCli(["init", "--path", missingDir], {
+      url: server.url,
+      cwd: tempBase,
+    });
+    expect(res.code).toBe(2);
+    expect(res.stderr).toContain("Path does not exist");
+  });
+
+  test("awb init on a file exits 2 with an error", async () => {
+    const filePath = path.join(tempBase, "file-not-dir.txt");
+    fs.writeFileSync(filePath, "test");
+    const res = await runCli(["init", "--path", filePath], {
+      url: server.url,
+      cwd: tempBase,
+    });
+    expect(res.code).toBe(2);
+    expect(res.stderr).toContain("Path is not a directory");
   });
 });

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import type { CliIo, GlobalOptions } from "./client.ts";
 import { apiRequest } from "./client.ts";
 import type { Project } from "../shared/types.ts";
@@ -9,11 +10,19 @@ export async function resolveProjectKey(
   if (opts.project) {
     return opts.project;
   }
+  let cwdToSend = io.cwd;
+  if (fs.existsSync(io.cwd)) {
+    try {
+      cwdToSend = fs.realpathSync(io.cwd);
+    } catch {
+      cwdToSend = io.cwd;
+    }
+  }
   const project = await apiRequest<Project>(
     io,
     opts,
     "GET",
-    `/api/projects/resolve?cwd=${encodeURIComponent(io.cwd)}`
+    `/api/projects/resolve?cwd=${encodeURIComponent(cwdToSend)}`
   );
   return project.key;
 }

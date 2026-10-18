@@ -10,18 +10,18 @@ import { DomainError, validation, notFound, conflict } from "../src/server/error
 
 describe("Walking skeleton", () => {
   test("GET /api/health returns ok and version", async () => {
-    const testApp = makeTestApp();
+    const testApp = await makeTestApp();
     try {
       const res = await testApp.request("GET", "/api/health");
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ ok: true, version: "0.1.0" });
     } finally {
-      testApp.close();
+      await testApp.close();
     }
   });
 
-  test("fresh data dir gets board.db and schema_version contains migrations", () => {
-    const testApp = makeTestApp();
+  test("fresh data dir gets board.db and schema_version contains migrations", async () => {
+    const testApp = await makeTestApp();
     try {
       const dbFile = path.join(testApp.dataDir, "board.db");
       expect(fs.existsSync(dbFile)).toBe(true);
@@ -52,22 +52,22 @@ describe("Walking skeleton", () => {
       const meta = testApp.ctx.db.all("SELECT * FROM app_meta");
       expect(meta).toEqual([]);
     } finally {
-      testApp.close();
+      await testApp.close();
     }
   });
 
-  test("running createApp twice on the same dir does not reapply migrations", () => {
+  test("running createApp twice on the same dir does not reapply migrations", async () => {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-test-reapply-"));
     try {
-      const app1 = createApp({ dataDir });
+      const app1 = await createApp({ dataDir });
       const count1 = app1.ctx.db.all("SELECT * FROM schema_version").length;
       expect(count1).toBe(6);
-      app1.close();
+      await app1.close();
 
-      const app2 = createApp({ dataDir });
+      const app2 = await createApp({ dataDir });
       const count2 = app2.ctx.db.all("SELECT * FROM schema_version").length;
       expect(count2).toBe(6);
-      app2.close();
+      await app2.close();
     } finally {
       fs.rmSync(dataDir, { recursive: true, force: true });
     }
@@ -120,7 +120,7 @@ describe("Walking skeleton", () => {
     expect(errConflict.code).toBe("CONFLICT");
     expect(errConflict.status).toBe(409);
 
-    const testApp = makeTestApp();
+    const testApp = await makeTestApp();
     try {
       testApp.app.get("/api/test-domain-error", () => {
         throw validation("bad payload");
@@ -141,7 +141,7 @@ describe("Walking skeleton", () => {
         error: { code: "INTERNAL", message: "unexpected explosion" },
       });
     } finally {
-      testApp.close();
+      await testApp.close();
     }
   });
 
@@ -151,7 +151,7 @@ describe("Walking skeleton", () => {
     fs.writeFileSync(path.join(staticDir, "style.css"), "body { color: red; }");
 
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-data-"));
-    const created = createApp({ dataDir, staticDir });
+    const created = await createApp({ dataDir, staticDir });
     try {
       const resFile = await created.app.request("/style.css");
       expect(resFile.status).toBe(200);
@@ -164,7 +164,7 @@ describe("Walking skeleton", () => {
       const resApiNotFound = await created.app.request("/api/unknown");
       expect(resApiNotFound.status).toBe(404);
     } finally {
-      created.close();
+      await created.close();
       fs.rmSync(staticDir, { recursive: true, force: true });
       fs.rmSync(dataDir, { recursive: true, force: true });
     }

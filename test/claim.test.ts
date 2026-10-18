@@ -19,7 +19,7 @@ describe("Task 16: Claim", () => {
     let projKey: string;
 
     beforeAll(async () => {
-      testApp = makeTestApp();
+      testApp = await makeTestApp();
       projKey = "CLM";
 
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-claim-proj-"));
@@ -30,8 +30,8 @@ describe("Task 16: Claim", () => {
       });
     });
 
-    afterAll(() => {
-      testApp.close();
+    afterAll(async () => {
+      await testApp.close();
     });
 
     test("skips assigned, flagged, blocked, non-todo tickets and picks top-ranked eligible", async () => {
@@ -238,7 +238,7 @@ describe("Task 16: Claim", () => {
     let events: BoardEvent[];
 
     beforeAll(async () => {
-      testApp = makeTestApp();
+      testApp = await makeTestApp();
       projKey = "RES";
       events = [];
 
@@ -254,8 +254,8 @@ describe("Task 16: Claim", () => {
       });
     });
 
-    afterAll(() => {
-      testApp.close();
+    afterAll(async () => {
+      await testApp.close();
     });
 
     test("assigns caller, moves to in_progress at bottom, records claimed activity, emits ticket.moved, ranks dense", async () => {
@@ -456,7 +456,7 @@ describe("Task 16: Claim", () => {
 
   describe("Concurrency", () => {
     test("20 parallel claims via Promise.all with different actors on single app -> exactly 5 distinct tickets, 15 nulls", async () => {
-      const testApp = makeTestApp();
+      const testApp = await makeTestApp();
       const projKey = "CONA";
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-conc-1-"));
 
@@ -506,13 +506,13 @@ describe("Task 16: Claim", () => {
       const assignees = new Set(successfulClaims.map((c) => c.body.ticket.assignee));
       expect(assignees.size).toBe(5);
 
-      testApp.close();
+      await testApp.close();
     });
 
     test("interleaving claims across two createApp instances opened on the same dataDir -> no duplicates", async () => {
       const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-conc-2-"));
-      const app1 = createApp({ dataDir });
-      const app2 = createApp({ dataDir });
+      const app1 = await createApp({ dataDir });
+      const app2 = await createApp({ dataDir });
 
       const projKey = "CONB";
       const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-conc-repo-"));
@@ -575,8 +575,8 @@ describe("Task 16: Claim", () => {
         expect(uniqueKeys.has(k)).toBe(true);
       }
 
-      app1.close();
-      app2.close();
+      await app1.close();
+      await app2.close();
       fs.rmSync(dataDir, { recursive: true, force: true });
       fs.rmSync(repoDir, { recursive: true, force: true });
     });

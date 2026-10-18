@@ -8,13 +8,13 @@ describe("Projects REST API", () => {
   let testApp: TestApp;
   let tempBase: string;
 
-  beforeAll(() => {
-    testApp = makeTestApp();
-    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-projects-test-"));
+  beforeAll(async () => {
+    testApp = await makeTestApp();
+    tempBase = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "awb-projects-test-")));
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
 
@@ -187,65 +187,57 @@ describe("Projects REST API", () => {
     expect(resNums.body.error.code).toBe("VALIDATION");
   });
 
-  test("relative path and missing dir return 400 VALIDATION", async () => {
-    // Relative path
+  test("relative path is rejected with 400 VALIDATION", async () => {
     const resRel = await testApp.request("POST", "/api/projects", {
       path: "./some/relative/path",
     });
     expect(resRel.status).toBe(400);
     expect(resRel.body).toEqual({
-      error: { code: "VALIDATION", message: "Path must be absolute" },
+      error: { code: "VALIDATION", message: "Project path must be absolute" },
     });
+  });
 
-    // Missing directory
-    const missingDir = path.join(tempBase, "missing-dir-xyz");
-    const resMissing = await testApp.request("POST", "/api/projects", {
+  test("server accepts a path that does not exist on disk", async () => {
+    const missingDir = path.join(tempBase, "does-not-exist-on-disk");
+    const res = await testApp.request("POST", "/api/projects", {
       path: missingDir,
+      name: "Nonexistent Project",
+      key: "NOEXT",
     });
-    expect(resMissing.status).toBe(400);
-    expect(resMissing.body.error.code).toBe("VALIDATION");
-
-    // File, not a directory
-    const filePath = path.join(tempBase, "plain-file.txt");
-    fs.writeFileSync(filePath, "hello");
-    const resFile = await testApp.request("POST", "/api/projects", {
-      path: filePath,
-    });
-    expect(resFile.status).toBe(400);
-    expect(resFile.body.error.code).toBe("VALIDATION");
+    expect(res.status).toBe(201);
+    expect(res.body.key).toBe("NOEXT");
+    expect(res.body.path).toBe(missingDir);
   });
 
-  test("duplicate path returns 409 CONFLICT (including via a symlink or trailing slash)", async () => {
-    const dupDir = path.join(tempBase, "dup-dir");
-    fs.mkdirSync(dupDir, { recursive: true });
-
-    const resFirst = await testApp.request("POST", "/api/projects", {
-      path: dupDir,
-      key: "DUP",
-    });
-    expect(resFirst.status).toBe(201);
-
-    // Trailing slash
+  test("trailing slashes are normalized and duplicate normalized paths are rejected with 409 CONFLICT", async () => {
+    const trailDir = path.join(tempBase, "slash-test");
     const resTrailing = await testApp.request("POST", "/api/projects", {
-      path: dupDir + "/",
+      path: trailDir + "///",
+      name: "Slash Project",
+      key: "SLASH",
     });
-    expect(resTrailing.status).toBe(409);
-    expect(resTrailing.body).toEqual({
-      error: { code: "CONFLICT", message: "Path already registered as DUP" },
+    expect(resTrailing.status).toBe(201);
+    expect(resTrailing.body.path).toBe(trailDir);
+
+    // Duplicate path without trailing slash
+    const resDup = await testApp.request("POST", "/api/projects", {
+      path: trailDir,
+    });
+    expect(resDup.status).toBe(409);
+    expect(resDup.body).toEqual({
+      error: { code: "CONFLICT", message: "Path already registered as SLASH" },
     });
 
-    // Symlink
-    const symlinkPath = path.join(tempBase, "dup-symlink");
-    fs.symlinkSync(dupDir, symlinkPath);
-
-    const resSymlink = await testApp.request("POST", "/api/projects", {
-      path: symlinkPath,
+    // Duplicate path with trailing slash
+    const resDupTrailing = await testApp.request("POST", "/api/projects", {
+      path: trailDir + "/",
     });
-    expect(resSymlink.status).toBe(409);
-    expect(resSymlink.body).toEqual({
-      error: { code: "CONFLICT", message: "Path already registered as DUP" },
+    expect(resDupTrailing.status).toBe(409);
+    expect(resDupTrailing.body).toEqual({
+      error: { code: "CONFLICT", message: "Path already registered as SLASH" },
     });
   });
+
 
   test("resolve: exact path, subdirectory, deepest of nested Projects, explicit key wins, no match", async () => {
     const parentDir = path.join(tempBase, "nest-parent");

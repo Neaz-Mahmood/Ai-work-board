@@ -12,7 +12,7 @@ describe("MCP tickets tools", () => {
   let subDir: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-mcp-tickets-test-"));
     repoDir = path.join(tempBase, "mcp-repo");
     subDir = path.join(repoDir, "src", "sub");
@@ -25,8 +25,8 @@ describe("MCP tickets tools", () => {
     });
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
 

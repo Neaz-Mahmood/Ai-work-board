@@ -19,9 +19,9 @@ describe("Comments - REST, MCP, and CLI", () => {
   let repoDir: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     server = await startTestServer();
-    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-comments-test-"));
+    tempBase = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "awb-comments-test-")));
     const appRepoDir = path.join(tempBase, "app-repo");
     fs.mkdirSync(appRepoDir, { recursive: true });
     repoDir = path.join(tempBase, "comment-repo");
@@ -44,7 +44,7 @@ describe("Comments - REST, MCP, and CLI", () => {
   });
 
   afterAll(async () => {
-    testApp.close();
+    await testApp.close();
     await server.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });

@@ -10,7 +10,7 @@ describe("Tickets Edit and Move REST API", () => {
   let repoDir: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-tickets-edit-test-"));
     repoDir = path.join(tempBase, "repo-edit");
     fs.mkdirSync(repoDir, { recursive: true });
@@ -22,8 +22,8 @@ describe("Tickets Edit and Move REST API", () => {
     });
   });
 
-  afterAll(() => {
-    testApp.close();
+  afterAll(async () => {
+    await testApp.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
 

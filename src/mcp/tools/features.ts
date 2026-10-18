@@ -20,7 +20,7 @@ export function registerFeatureTools(
     "List all features in a project with their progress metrics (completed and total ticket counts) and visual badge colors.",
     {
       project: z.string().optional().describe("Optional project key. If omitted, the project is resolved from cwd or the nearest registered parent directory"),
-      cwd: z.string().optional().describe("Optional repository directory path used to resolve the project when project key is omitted (deepest match wins)"),
+      cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
     },
     async (args) => {
       return withToolResult(() => {
@@ -48,7 +48,7 @@ export function registerFeatureTools(
     "Planning step: create a Feature and its ordered Tickets in one call. Tickets land in Backlog for the user to approve. Use blockedByIndexes to order work within the list.",
     {
       project: z.string().optional().describe("Optional project key. If omitted, the project is resolved from cwd or the nearest registered parent directory"),
-      cwd: z.string().optional().describe("Optional repository directory path used to resolve the project when project key is omitted (deepest match wins)"),
+      cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
       name: z.string().describe("Unique feature name within this project (1-100 characters)"),
       description: z.string().optional().describe("Optional markdown description outlining feature architecture, requirements, or scope"),
       color: z.string().optional().describe("Optional hex color code (#RRGGBB) for the feature card badge (auto-selected from palette if omitted)"),

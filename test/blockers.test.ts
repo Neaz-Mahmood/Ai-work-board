@@ -21,9 +21,9 @@ describe("Blockers - Domain, REST, MCP, and CLI", () => {
   let serverRepoDir: string;
 
   beforeAll(async () => {
-    testApp = makeTestApp();
+    testApp = await makeTestApp();
     server = await startTestServer();
-    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), "awb-blockers-test-"));
+    tempBase = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "awb-blockers-test-")));
     appRepoDir = path.join(tempBase, "app-repo");
     fs.mkdirSync(appRepoDir, { recursive: true });
     otherRepoDir = path.join(tempBase, "other-repo");
@@ -56,7 +56,7 @@ describe("Blockers - Domain, REST, MCP, and CLI", () => {
   });
 
   afterAll(async () => {
-    testApp.close();
+    await testApp.close();
     await server.close();
     fs.rmSync(tempBase, { recursive: true, force: true });
   });
