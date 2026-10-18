@@ -7,7 +7,7 @@ export function createEventsRoute(ctx: Ctx, sseHeartbeatMs?: number): Hono {
   const router = new Hono();
   const heartbeatMs = sseHeartbeatMs ?? 25000;
 
-  router.get("/", (c) => {
+  router.get("/", async (c) => {
     const project = c.req.query("project");
 
     return streamSSE(c, async (stream) => {

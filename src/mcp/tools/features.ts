@@ -23,9 +23,9 @@ export function registerFeatureTools(
       cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
     },
     async (args) => {
-      return withToolResult(() => {
-        const project = resolveProject(ctx, { key: args.project, cwd: args.cwd });
-        return listFeatures(ctx, project.key);
+      return withToolResult(async () => {
+        const project = await resolveProject(ctx, { key: args.project, cwd: args.cwd });
+        return await listFeatures(ctx, project.key);
       });
     }
   );
@@ -37,8 +37,8 @@ export function registerFeatureTools(
       featureId: z.number().int().describe("Numerical ID of the feature to fetch"),
     },
     async (args) => {
-      return withToolResult(() => {
-        return getFeature(ctx, args.featureId);
+      return withToolResult(async () => {
+        return await getFeature(ctx, args.featureId);
       });
     }
   );
@@ -77,10 +77,10 @@ export function registerFeatureTools(
       actor: z.string().optional().describe("Optional actor name creating the feature (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        const project = resolveProject(ctx, { key: args.project, cwd: args.cwd });
-        return createFeature(ctx, actor, project.key, {
+        const project = await resolveProject(ctx, { key: args.project, cwd: args.cwd });
+        return await createFeature(ctx, actor, project.key, {
           name: args.name,
           description: args.description,
           color: args.color,
@@ -101,13 +101,13 @@ export function registerFeatureTools(
       actor: z.string().optional().describe("Optional actor name performing the update (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
         const patch: Record<string, unknown> = {};
         if (args.name !== undefined) patch.name = args.name;
         if (args.description !== undefined) patch.description = args.description;
         if (args.color !== undefined) patch.color = args.color;
-        return updateFeature(ctx, actor, args.featureId, patch);
+        return await updateFeature(ctx, actor, args.featureId, patch);
       });
     }
   );

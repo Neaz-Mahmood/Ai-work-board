@@ -1,17 +1,17 @@
 import type { Ctx } from "./context.ts";
 import type { ActivityEntry } from "../shared/types.ts";
 
-export function recordActivity(
+export async function recordActivity(
   ctx: Ctx,
   ticketId: number,
   actor: string,
   kind: string,
   payload: Record<string, unknown>
-): ActivityEntry {
+): Promise<ActivityEntry> {
   const at = ctx.clock.now().toISOString();
   const payloadStr = JSON.stringify(payload);
-  const result = ctx.db.run(
-    "INSERT INTO activity (ticket_id, actor, at, kind, payload) VALUES (?, ?, ?, ?, ?)",
+  const result = await ctx.db.get<{ id: number }>(
+    "INSERT INTO activity (ticket_id, actor, at, kind, payload) VALUES (?, ?, ?, ?, ?) RETURNING id",
     ticketId,
     actor,
     at,
@@ -20,7 +20,7 @@ export function recordActivity(
   );
 
   return {
-    id: result.lastInsertRowid,
+    id: Number(result!.id),
     actor,
     at,
     kind,
@@ -28,8 +28,8 @@ export function recordActivity(
   };
 }
 
-export function listActivity(ctx: Ctx, ticketId: number): ActivityEntry[] {
-  const rows = ctx.db.all<{
+export async function listActivity(ctx: Ctx, ticketId: number): Promise<ActivityEntry[]> {
+  const rows = await ctx.db.all<{
     id: number;
     actor: string;
     at: string;
@@ -41,7 +41,7 @@ export function listActivity(ctx: Ctx, ticketId: number): ActivityEntry[] {
   );
 
   return rows.map((r) => ({
-    id: r.id,
+    id: Number(r.id),
     actor: r.actor,
     at: r.at,
     kind: r.kind,

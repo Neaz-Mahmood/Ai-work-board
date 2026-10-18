@@ -13,9 +13,9 @@ import {
 export function createFeaturesRoute(ctx: Ctx): Hono {
   const router = new Hono();
 
-  router.get("/api/projects/:key/features", (c) => {
+  router.get("/api/projects/:key/features", async (c) => {
     const key = c.req.param("key");
-    const features = listFeatures(ctx, key);
+    const features = await listFeatures(ctx, key);
     return c.json(features);
   });
 
@@ -34,7 +34,7 @@ export function createFeaturesRoute(ctx: Ctx): Hono {
       throw validation("Request body must be an object");
     }
 
-    const result = createFeature(ctx, actor, key, {
+    const result = await createFeature(ctx, actor, key, {
       name: body.name,
       description: body.description,
       color: body.color,
@@ -44,12 +44,12 @@ export function createFeaturesRoute(ctx: Ctx): Hono {
     return c.json(result, 201);
   });
 
-  router.get("/api/features/:id", (c) => {
+  router.get("/api/features/:id", async (c) => {
     const id = parseInt(c.req.param("id"), 10);
     if (Number.isNaN(id)) {
       throw notFound("Feature not found");
     }
-    const feature = getFeature(ctx, id);
+    const feature = await getFeature(ctx, id);
     return c.json(feature);
   });
 
@@ -71,17 +71,17 @@ export function createFeaturesRoute(ctx: Ctx): Hono {
       throw validation("Request body must be an object");
     }
 
-    const feature = updateFeature(ctx, actor, id, body);
+    const feature = await updateFeature(ctx, actor, id, body);
     return c.json(feature);
   });
 
-  router.delete("/api/features/:id", (c) => {
+  router.delete("/api/features/:id", async (c) => {
     const id = parseInt(c.req.param("id"), 10);
     if (Number.isNaN(id)) {
       throw notFound("Feature not found");
     }
     const actor = restActor(c.req.header("X-AWB-Actor"));
-    deleteFeature(ctx, actor, id);
+    await deleteFeature(ctx, actor, id);
     return c.body(null, 204);
   });
 

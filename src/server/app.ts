@@ -4,7 +4,9 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Clock } from "./clock.ts";
 import { systemClock } from "./clock.ts";
-import { openSqlite } from "./db.ts";
+import type { Db } from "./db.ts";
+import { openPglite } from "./db-pglite.ts";
+import { openPostgres } from "./db-postgres.ts";
 import { migrate } from "./migrations.ts";
 import { DomainError } from "./errors.ts";
 import type { Ctx } from "../domain/context.ts";
@@ -21,17 +23,29 @@ export type AppOptions = {
   clock?: Clock;
   staticDir?: string;
   sseHeartbeatMs?: number;
+  database?: { kind: "pglite"; dir?: string } | { kind: "postgres"; url: string; schema?: string };
 };
 
 export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx; close(): Promise<void> }> {
   fs.mkdirSync(opts.dataDir, { recursive: true });
-  const dbFile = path.join(opts.dataDir, "board.db");
-  const { db, adb, close: closeDb } = openSqlite(dbFile);
-  migrate(db);
+
+  const databaseConfig = opts.database ?? {
+    kind: "pglite" as const,
+    dir: path.join(opts.dataDir, "pgdata"),
+  };
+
+  let db: Db & { close(): Promise<void> };
+  if (databaseConfig.kind === "postgres") {
+    db = await openPostgres(databaseConfig.url, { schema: databaseConfig.schema });
+  } else {
+    db = await openPglite(databaseConfig.dir);
+  }
+
+  await migrate(db);
 
   const clock = opts.clock ?? systemClock;
   const events = new EventBus();
-  const ctx: Ctx = { db, adb, clock, events };
+  const ctx: Ctx = { db, clock, events };
 
   const app = new Hono();
 
@@ -89,7 +103,7 @@ export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx
     app,
     ctx,
     async close(): Promise<void> {
-      closeDb();
+      await db.close();
     },
   };
 }

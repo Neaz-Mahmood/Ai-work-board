@@ -46,7 +46,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
       featureId = body.featureId;
     }
 
-    const ticket = claimNextTicket(ctx, actor, key, { featureId });
+    const ticket = await claimNextTicket(ctx, actor, key, { featureId });
     return c.json({ ticket }, 200);
   });
 
@@ -65,7 +65,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
       throw validation("Request body must be an object");
     }
 
-    const ticket = createTicket(ctx, actor, key, {
+    const ticket = await createTicket(ctx, actor, key, {
       title: body.title,
       description: body.description,
       column: body.column as ColumnId | undefined,
@@ -78,14 +78,14 @@ export function createTicketsRoute(ctx: Ctx): Hono {
     return c.json(ticket, 201);
   });
 
-  router.get("/api/projects/:key/tickets", (c) => {
+  router.get("/api/projects/:key/tickets", async (c) => {
     const key = c.req.param("key");
     const column = c.req.query("column") as ColumnId | undefined;
     const assignee = c.req.query("assignee");
     const q = c.req.query("q");
     const feature = c.req.query("feature");
 
-    const cards = listTickets(ctx, key, {
+    const cards = await listTickets(ctx, key, {
       column: column || undefined,
       assignee: assignee || undefined,
       q: q || undefined,
@@ -95,14 +95,14 @@ export function createTicketsRoute(ctx: Ctx): Hono {
     return c.json(cards);
   });
 
-  router.get("/api/projects/:key/board", (c) => {
+  router.get("/api/projects/:key/board", async (c) => {
     const key = c.req.param("key");
     const column = c.req.query("column") as ColumnId | undefined;
     const assignee = c.req.query("assignee");
     const q = c.req.query("q");
     const feature = c.req.query("feature");
 
-    const board = getBoard(ctx, key, {
+    const board = await getBoard(ctx, key, {
       column: column || undefined,
       assignee: assignee || undefined,
       q: q || undefined,
@@ -111,9 +111,9 @@ export function createTicketsRoute(ctx: Ctx): Hono {
     return c.json(board);
   });
 
-  router.get("/api/tickets/:ticketKey", (c) => {
+  router.get("/api/tickets/:ticketKey", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const ticket = getTicket(ctx, ticketKey);
+    const ticket = await getTicket(ctx, ticketKey);
     return c.json(ticket);
   });
 
@@ -132,7 +132,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
       throw validation("Request body must be an object");
     }
 
-    const comment = addComment(ctx, actor, ticketKey, body.body);
+    const comment = await addComment(ctx, actor, ticketKey, body.body);
     return c.json(comment, 201);
   });
 
@@ -151,7 +151,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
       throw validation("Request body must be an object");
     }
 
-    const ticket = updateTicket(ctx, actor, ticketKey, body);
+    const ticket = await updateTicket(ctx, actor, ticketKey, body);
     return c.json(ticket);
   });
 
@@ -170,14 +170,14 @@ export function createTicketsRoute(ctx: Ctx): Hono {
       throw validation("Request body must be an object");
     }
 
-    const ticket = moveTicket(ctx, actor, ticketKey, body);
+    const ticket = await moveTicket(ctx, actor, ticketKey, body);
     return c.json(ticket);
   });
 
-  router.delete("/api/tickets/:ticketKey", (c) => {
+  router.delete("/api/tickets/:ticketKey", async (c) => {
     const ticketKey = c.req.param("ticketKey");
     const actor = restActor(c.req.header("X-AWB-Actor"));
-    deleteTicket(ctx, actor, ticketKey);
+    await deleteTicket(ctx, actor, ticketKey);
     return c.body(null, 204);
   });
 
@@ -200,16 +200,16 @@ export function createTicketsRoute(ctx: Ctx): Hono {
       throw validation("blockerKey is required");
     }
 
-    const ticket = addBlocker(ctx, actor, ticketKey, body.blockerKey.trim());
+    const ticket = await addBlocker(ctx, actor, ticketKey, body.blockerKey.trim());
     return c.json(ticket);
   });
 
-  router.delete("/api/tickets/:ticketKey/blockers/:blockerKey", (c) => {
+  router.delete("/api/tickets/:ticketKey/blockers/:blockerKey", async (c) => {
     const ticketKey = c.req.param("ticketKey");
     const blockerKey = c.req.param("blockerKey");
     const actor = restActor(c.req.header("X-AWB-Actor"));
 
-    const ticket = removeBlocker(ctx, actor, ticketKey, blockerKey);
+    const ticket = await removeBlocker(ctx, actor, ticketKey, blockerKey);
     return c.json(ticket);
   });
 
@@ -228,20 +228,20 @@ export function createTicketsRoute(ctx: Ctx): Hono {
       throw validation("Request body must be an object");
     }
 
-    const ticket = setNeedsAttention(ctx, actor, ticketKey, body.reason);
+    const ticket = await setNeedsAttention(ctx, actor, ticketKey, body.reason);
     return c.json(ticket);
   });
 
-  router.delete("/api/tickets/:ticketKey/attention", (c) => {
+  router.delete("/api/tickets/:ticketKey/attention", async (c) => {
     const ticketKey = c.req.param("ticketKey");
     const actor = restActor(c.req.header("X-AWB-Actor"));
 
-    const ticket = clearNeedsAttention(ctx, actor, ticketKey);
+    const ticket = await clearNeedsAttention(ctx, actor, ticketKey);
     return c.json(ticket);
   });
 
-  router.get("/api/actors", (c) => {
-    const actors = listActors(ctx);
+  router.get("/api/actors", async (c) => {
+    const actors = await listActors(ctx);
     return c.json(actors);
   });
 

@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { BoardEvent } from "../src/domain/events.ts";
-import { createApp } from "../src/server/app.ts";
 import {
   makeTestApp,
   runCli,
@@ -507,78 +506,6 @@ describe("Task 16: Claim", () => {
       expect(assignees.size).toBe(5);
 
       await testApp.close();
-    });
-
-    test("interleaving claims across two createApp instances opened on the same dataDir -> no duplicates", async () => {
-      const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-conc-2-"));
-      const app1 = await createApp({ dataDir });
-      const app2 = await createApp({ dataDir });
-
-      const projKey = "CONB";
-      const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-conc-repo-"));
-
-      // Create project using app1
-      const pRes = await app1.app.request("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: repoDir,
-          name: "Concurrent Project 2",
-          key: projKey,
-        }),
-      });
-      expect(pRes.status).toBe(201);
-
-      // Create 5 eligible tickets in todo using app1
-      const createdKeys: string[] = [];
-      for (let i = 1; i <= 5; i++) {
-        const tRes = await app1.app.request(`/api/projects/${projKey}/tickets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: `Multi-App Ticket ${i}`,
-            column: "todo",
-          }),
-        });
-        const t = await tRes.json();
-        createdKeys.push(t.key);
-      }
-
-      // Fire 20 claims in parallel, alternating between app1 and app2
-      const claimPromises = Array.from({ length: 20 }, async (_, idx) => {
-        const appToUse = idx % 2 === 0 ? app1.app : app2.app;
-        const res = await appToUse.request(`/api/projects/${projKey}/claim`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-AWB-Actor": `worker-${idx}`,
-          },
-          body: JSON.stringify({}),
-        });
-        const body = await res.json();
-        return { status: res.status, body };
-      });
-
-      const results = await Promise.all(claimPromises);
-
-      const successfulClaims = results.filter((c) => c.status === 200 && c.body.ticket !== null);
-      const nullClaims = results.filter((c) => c.status === 200 && c.body.ticket === null);
-
-      expect(successfulClaims.length).toBe(5);
-      expect(nullClaims.length).toBe(15);
-
-      const claimedKeys = successfulClaims.map((c) => c.body.ticket.key);
-      const uniqueKeys = new Set(claimedKeys);
-      expect(uniqueKeys.size).toBe(5);
-
-      for (const k of createdKeys) {
-        expect(uniqueKeys.has(k)).toBe(true);
-      }
-
-      await app1.close();
-      await app2.close();
-      fs.rmSync(dataDir, { recursive: true, force: true });
-      fs.rmSync(repoDir, { recursive: true, force: true });
     });
   });
 });

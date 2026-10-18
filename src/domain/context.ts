@@ -1,10 +1,9 @@
-import type { Db, AsyncDb } from "../server/db.ts";
+import type { Db } from "../server/db.ts";
 import type { Clock } from "../server/clock.ts";
 import type { EventBus } from "./events.ts";
 
 export type Ctx = {
   db: Db;
-  adb: AsyncDb;
   clock: Clock;
   events: EventBus;
 };

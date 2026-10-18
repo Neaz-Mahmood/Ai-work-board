@@ -127,8 +127,8 @@ describe("Features Backend (Task 14)", () => {
   });
 
   test("2. forward/self index rejected and nothing is created (rollback)", async () => {
-    const beforeFeatures = testApp.ctx.db.all("SELECT * FROM features");
-    const beforeTickets = testApp.ctx.db.all("SELECT * FROM tickets");
+    const beforeFeatures = await testApp.ctx.db.all("SELECT * FROM features");
+    const beforeTickets = await testApp.ctx.db.all("SELECT * FROM tickets");
 
     // Self-index on ticket 0
     const resSelf = await testApp.request(
@@ -172,8 +172,8 @@ describe("Features Backend (Task 14)", () => {
     );
 
     // Assert complete rollback
-    const afterFeatures = testApp.ctx.db.all("SELECT * FROM features");
-    const afterTickets = testApp.ctx.db.all("SELECT * FROM tickets");
+    const afterFeatures = await testApp.ctx.db.all("SELECT * FROM features");
+    const afterTickets = await testApp.ctx.db.all("SELECT * FROM tickets");
     expect(afterFeatures.length).toBe(beforeFeatures.length);
     expect(afterTickets.length).toBe(beforeTickets.length);
   });

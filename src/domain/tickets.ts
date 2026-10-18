@@ -42,12 +42,12 @@ export type ListTicketsFilters = {
   featureId?: number;
 };
 
-export function createTicketTx(
+export async function createTicketTx(
   ctx: Ctx,
   actor: string,
   projectKey: string,
   input: CreateTicketInput
-): Ticket {
+): Promise<Ticket> {
   if (!input || typeof input !== "object") {
     throw validation("Input must be an object");
   }
@@ -122,12 +122,12 @@ export function createTicketTx(
     featureId = input.featureId;
   }
 
-  const project = ctx.db.get<{
+  const project = await ctx.db.get<{
     id: number;
     key: string;
     next_ticket_number: number;
   }>(
-    "SELECT id, key, next_ticket_number FROM projects WHERE UPPER(key) = UPPER(?)",
+    "SELECT id, key, next_ticket_number FROM projects WHERE lower(key) = lower(?)",
     projectKey
   );
   if (!project) {
@@ -135,7 +135,7 @@ export function createTicketTx(
   }
 
   if (featureId !== null) {
-    const feat = ctx.db.get<{ id: number }>(
+    const feat = await ctx.db.get<{ id: number }>(
       "SELECT id FROM features WHERE id = ? AND project_id = ?",
       featureId,
       project.id
@@ -148,28 +148,28 @@ export function createTicketTx(
   const number = project.next_ticket_number;
   const now = ctx.clock.now().toISOString();
 
-  ctx.db.run(
+  await ctx.db.run(
     "UPDATE projects SET next_ticket_number = next_ticket_number + 1, updated_at = ? WHERE id = ?",
     now,
     project.id
   );
 
-  const countRow = ctx.db.get<{ count: number }>(
-    "SELECT COUNT(*) as count FROM tickets WHERE project_id = ? AND column_id = ?",
+  const countRow = await ctx.db.get<{ count: number | string }>(
+    "SELECT COUNT(*)::int as count FROM tickets WHERE project_id = ? AND column_id = ?",
     project.id,
     column
   );
-  const rank = countRow?.count ?? 0;
+  const rank = countRow ? Number(countRow.count) : 0;
 
-  touchActor(ctx, actor);
+  await touchActor(ctx, actor);
   if (assignee) {
-    touchActor(ctx, assignee);
+    await touchActor(ctx, assignee);
   }
 
-  const insertResult = ctx.db.run(
+  const insertResult = await ctx.db.get<{ id: number }>(
     `INSERT INTO tickets (
       project_id, number, title, description, column_id, rank, priority, assignee, attention_reason, feature_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?) RETURNING id`,
     project.id,
     number,
     trimmedTitle,
@@ -182,10 +182,11 @@ export function createTicketTx(
     now,
     now
   );
+  const ticketId = Number(insertResult!.id);
 
-  recordActivity(
+  await recordActivity(
     ctx,
-    insertResult.lastInsertRowid,
+    ticketId,
     actor,
     "created",
     { column }
@@ -194,10 +195,10 @@ export function createTicketTx(
   const ticketKey = `${project.key}-${number}`;
 
   if (input.blockedBy && input.blockedBy.length > 0) {
-    attachBlockersOnCreate(
+    await attachBlockersOnCreate(
       ctx,
       actor,
-      insertResult.lastInsertRowid,
+      ticketId,
       project.id,
       project.key,
       number,
@@ -205,17 +206,17 @@ export function createTicketTx(
     );
   }
 
-  return getTicket(ctx, ticketKey);
+  return await getTicket(ctx, ticketKey);
 }
 
-export function createTicket(
+export async function createTicket(
   ctx: Ctx,
   actor: string,
   projectKey: string,
   input: CreateTicketInput
-): Ticket {
-  const ticket = ctx.db.tx(() => {
-    return createTicketTx(ctx, actor, projectKey, input);
+): Promise<Ticket> {
+  const ticket = await ctx.db.tx(async () => {
+    return await createTicketTx(ctx, actor, projectKey, input);
   });
 
   ctx.events.emit({
@@ -243,18 +244,18 @@ export function parseTicketKey(ticketKey: string): { projectKey: string; ticketN
   };
 }
 
-export function getTicket(ctx: Ctx, ticketKey: string): Ticket {
+export async function getTicket(ctx: Ctx, ticketKey: string): Promise<Ticket> {
   const { projectKey, ticketNumber } = parseTicketKey(ticketKey);
 
-  const project = ctx.db.get<{ id: number; key: string }>(
-    "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  const project = await ctx.db.get<{ id: number; key: string }>(
+    "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
     projectKey
   );
   if (!project) {
     throw notFound(`Ticket ${ticketKey} not found`);
   }
 
-  const row = ctx.db.get<{
+  const row = await ctx.db.get<{
     id: number;
     project_id: number;
     number: number;
@@ -270,7 +271,7 @@ export function getTicket(ctx: Ctx, ticketKey: string): Ticket {
     feature_color: string | null;
     created_at: string;
     updated_at: string;
-    blocked: number;
+    blocked: number | boolean;
   }>(
     `SELECT
       t.*,
@@ -294,9 +295,9 @@ export function getTicket(ctx: Ctx, ticketKey: string): Ticket {
     throw notFound(`Ticket ${ticketKey} not found`);
   }
 
-  const blockers = ctx.db.all<TicketLink>(
+  const blockers = await ctx.db.all<TicketLink>(
     `SELECT
-      p.key || '-' || b.number AS key,
+      p.key || '-' || b.number::text AS key,
       b.title,
       b.column_id AS column
     FROM ticket_blockers tb
@@ -307,9 +308,9 @@ export function getTicket(ctx: Ctx, ticketKey: string): Ticket {
     row.id
   );
 
-  const blocks = ctx.db.all<TicketLink>(
+  const blocks = await ctx.db.all<TicketLink>(
     `SELECT
-      p.key || '-' || t.number AS key,
+      p.key || '-' || t.number::text AS key,
       t.title,
       t.column_id AS column
     FROM ticket_blockers tb
@@ -320,8 +321,8 @@ export function getTicket(ctx: Ctx, ticketKey: string): Ticket {
     row.id
   );
 
-  const activity = listActivity(ctx, row.id);
-  const comments = listComments(ctx, row.id);
+  const activity = await listActivity(ctx, row.id);
+  const comments = await listComments(ctx, row.id);
 
   return {
     key: `${project.key}-${row.number}`,
@@ -338,7 +339,7 @@ export function getTicket(ctx: Ctx, ticketKey: string): Ticket {
           }
         : null,
     assignee: row.assignee ?? null,
-    blocked: Boolean(row.blocked),
+    blocked: row.blocked === true || row.blocked === 1,
     needsAttention: row.attention_reason ?? null,
     projectKey: project.key,
     number: row.number,
@@ -361,12 +362,12 @@ export type UpdateTicketPatch = {
   [key: string]: unknown;
 };
 
-export function updateTicket(
+export async function updateTicket(
   ctx: Ctx,
   actor: string,
   ticketKey: string,
   patch: UpdateTicketPatch
-): Ticket {
+): Promise<Ticket> {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
     throw validation("Input must be an object");
   }
@@ -446,18 +447,18 @@ export function updateTicket(
 
   let changed = false;
 
-  const ticket = ctx.db.tx(() => {
+  const ticket = await ctx.db.tx(async () => {
     const { projectKey, ticketNumber } = parseTicketKey(ticketKey);
 
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey
     );
     if (!project) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const row = ctx.db.get<{
+    const row = await ctx.db.get<{
       id: number;
       project_id: number;
       number: number;
@@ -482,7 +483,7 @@ export function updateTicket(
     }
 
     if (newFeatureId !== undefined && newFeatureId !== null) {
-      const feat = ctx.db.get<{ id: number; name: string }>(
+      const feat = await ctx.db.get<{ id: number; name: string }>(
         "SELECT id, name FROM features WHERE id = ? AND project_id = ?",
         newFeatureId,
         project.id
@@ -492,11 +493,11 @@ export function updateTicket(
       }
     }
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
     if (trimmedTitle !== undefined && trimmedTitle !== row.title) {
       changed = true;
-      recordActivity(ctx, row.id, actor, "updated", {
+      await recordActivity(ctx, row.id, actor, "updated", {
         field: "title",
         from: row.title,
         to: trimmedTitle,
@@ -505,7 +506,7 @@ export function updateTicket(
 
     if (patch.description !== undefined && patch.description !== row.description) {
       changed = true;
-      recordActivity(ctx, row.id, actor, "updated", {
+      await recordActivity(ctx, row.id, actor, "updated", {
         field: "description",
         from: row.description,
         to: patch.description,
@@ -514,7 +515,7 @@ export function updateTicket(
 
     if (patch.priority !== undefined && patch.priority !== row.priority) {
       changed = true;
-      recordActivity(ctx, row.id, actor, "updated", {
+      await recordActivity(ctx, row.id, actor, "updated", {
         field: "priority",
         from: row.priority,
         to: patch.priority,
@@ -525,9 +526,9 @@ export function updateTicket(
     if (newAssignee !== undefined && newAssignee !== currentAssignee) {
       changed = true;
       if (newAssignee !== null) {
-        touchActor(ctx, newAssignee);
+        await touchActor(ctx, newAssignee);
       }
-      recordActivity(ctx, row.id, actor, "assigned", {
+      await recordActivity(ctx, row.id, actor, "assigned", {
         from: currentAssignee,
         to: newAssignee,
       });
@@ -538,7 +539,7 @@ export function updateTicket(
       changed = true;
       let currentFeatureName: string | null = null;
       if (currentFeatureId !== null) {
-        const currentFeat = ctx.db.get<{ name: string }>(
+        const currentFeat = await ctx.db.get<{ name: string }>(
           "SELECT name FROM features WHERE id = ?",
           currentFeatureId
         );
@@ -546,13 +547,13 @@ export function updateTicket(
       }
       let newFeatureName: string | null = null;
       if (newFeatureId !== null) {
-        const feat = ctx.db.get<{ name: string }>(
+        const feat = await ctx.db.get<{ name: string }>(
           "SELECT name FROM features WHERE id = ?",
           newFeatureId
         );
         newFeatureName = feat?.name ?? null;
       }
-      recordActivity(ctx, row.id, actor, "updated", {
+      await recordActivity(ctx, row.id, actor, "updated", {
         field: "feature",
         from: currentFeatureName,
         to: newFeatureName,
@@ -571,7 +572,7 @@ export function updateTicket(
       const finalFeatureId =
         newFeatureId !== undefined ? newFeatureId : row.feature_id;
 
-      ctx.db.run(
+      await ctx.db.run(
         `UPDATE tickets SET
           title = ?,
           description = ?,
@@ -590,7 +591,7 @@ export function updateTicket(
       );
     }
 
-    return getTicket(ctx, `${project.key}-${row.number}`);
+    return await getTicket(ctx, `${project.key}-${row.number}`);
   });
 
   if (changed) {
@@ -606,12 +607,12 @@ export function updateTicket(
   return ticket;
 }
 
-export function compactColumnRanks(
+export async function compactColumnRanks(
   ctx: Ctx,
   projectId: number,
   columnId: ColumnId,
   excludeTicketId?: number
-): void {
+): Promise<void> {
   const sql =
     excludeTicketId !== undefined
       ? "SELECT id, rank FROM tickets WHERE project_id = ? AND column_id = ? AND id != ? ORDER BY rank ASC, id ASC"
@@ -620,23 +621,23 @@ export function compactColumnRanks(
     excludeTicketId !== undefined
       ? [projectId, columnId, excludeTicketId]
       : [projectId, columnId];
-  const tickets = ctx.db.all<{ id: number; rank: number }>(sql, ...params);
+  const tickets = await ctx.db.all<{ id: number; rank: number }>(sql, ...params);
   for (let i = 0; i < tickets.length; i++) {
     if (tickets[i].rank !== i) {
-      ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, tickets[i].id);
+      await ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, tickets[i].id);
     }
   }
 }
 
-export function insertTicketAtRank(
+export async function insertTicketAtRank(
   ctx: Ctx,
   ticketId: number,
   projectId: number,
   targetColumn: ColumnId,
   position?: number | null,
   now?: string
-): number {
-  const targetColTickets = ctx.db.all<{ id: number; rank: number }>(
+): Promise<number> {
+  const targetColTickets = await ctx.db.all<{ id: number; rank: number }>(
     "SELECT id, rank FROM tickets WHERE project_id = ? AND column_id = ? AND id != ? ORDER BY rank ASC, id ASC",
     projectId,
     targetColumn,
@@ -661,7 +662,7 @@ export function insertTicketAtRank(
   for (let i = 0; i < newTargetOrder.length; i++) {
     const t = newTargetOrder[i];
     if (t.id === ticketId) {
-      ctx.db.run(
+      await ctx.db.run(
         "UPDATE tickets SET column_id = ?, rank = ?, updated_at = ? WHERE id = ?",
         targetColumn,
         i,
@@ -669,7 +670,7 @@ export function insertTicketAtRank(
         t.id
       );
     } else if (t.rank !== i) {
-      ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
+      await ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
     }
   }
 
@@ -682,12 +683,12 @@ export type MoveTicketInput = {
   [key: string]: unknown;
 };
 
-export function moveTicket(
+export async function moveTicket(
   ctx: Ctx,
   actor: string,
   ticketKey: string,
   input: MoveTicketInput
-): Ticket {
+): Promise<Ticket> {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw validation("Input must be an object");
   }
@@ -718,18 +719,18 @@ export function moveTicket(
   let blockedDependents: { project_key: string; number: number }[] = [];
   let oldColumnId: ColumnId | undefined;
 
-  const ticket = ctx.db.tx(() => {
+  const ticket = await ctx.db.tx(async () => {
     const { projectKey, ticketNumber } = parseTicketKey(ticketKey);
 
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey
     );
     if (!project) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const row = ctx.db.get<{
+    const row = await ctx.db.get<{
       id: number;
       project_id: number;
       number: number;
@@ -753,7 +754,7 @@ export function moveTicket(
     }
 
     oldColumnId = row.column_id;
-    blockedDependents = ctx.db.all<{ project_key: string; number: number }>(
+    blockedDependents = await ctx.db.all<{ project_key: string; number: number }>(
       `SELECT p.key as project_key, t.number
        FROM ticket_blockers tb
        JOIN tickets t ON tb.ticket_id = t.id
@@ -762,14 +763,14 @@ export function moveTicket(
       row.id
     );
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
     const oldColumn = row.column_id;
     const oldRank = row.rank;
 
     if (oldColumn === targetColumn) {
       // Reorder within the same column
-      const otherTickets = ctx.db.all<{ id: number; rank: number }>(
+      const otherTickets = await ctx.db.all<{ id: number; rank: number }>(
         "SELECT id, rank FROM tickets WHERE project_id = ? AND column_id = ? AND id != ? ORDER BY rank ASC, id ASC",
         project.id,
         oldColumn,
@@ -796,18 +797,18 @@ export function moveTicket(
         for (let i = 0; i < newOrder.length; i++) {
           const t = newOrder[i];
           if (t.id === row.id) {
-            ctx.db.run(
+            await ctx.db.run(
               "UPDATE tickets SET rank = ?, updated_at = ? WHERE id = ?",
               i,
               now,
               t.id
             );
           } else if (t.rank !== i) {
-            ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
+            await ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
           }
         }
 
-        recordActivity(ctx, row.id, actor, "reranked", {
+        await recordActivity(ctx, row.id, actor, "reranked", {
           from: oldRank,
           to: targetPos,
         });
@@ -821,9 +822,9 @@ export function moveTicket(
         for (let i = 0; i < newOrder.length; i++) {
           const t = newOrder[i];
           if (t.id !== row.id && t.rank !== i) {
-            ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
+            await ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
           } else if (t.id === row.id && t.rank !== i) {
-            ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
+            await ctx.db.run("UPDATE tickets SET rank = ? WHERE id = ?", i, t.id);
           }
         }
       }
@@ -832,16 +833,16 @@ export function moveTicket(
       changed = true;
       const now = ctx.clock.now().toISOString();
 
-      compactColumnRanks(ctx, project.id, oldColumn, row.id);
-      insertTicketAtRank(ctx, row.id, project.id, targetColumn, input.position, now);
+      await compactColumnRanks(ctx, project.id, oldColumn, row.id);
+      await insertTicketAtRank(ctx, row.id, project.id, targetColumn, input.position, now);
 
-      recordActivity(ctx, row.id, actor, "moved", {
+      await recordActivity(ctx, row.id, actor, "moved", {
         from: oldColumn,
         to: targetColumn,
       });
     }
 
-    return getTicket(ctx, `${project.key}-${row.number}`);
+    return await getTicket(ctx, `${project.key}-${row.number}`);
   });
 
   if (changed) {
@@ -869,13 +870,13 @@ export function moveTicket(
   return ticket;
 }
 
-export function listTickets(
+export async function listTickets(
   ctx: Ctx,
   projectKey: string,
   filters: ListTicketsFilters = {}
-): Card[] {
-  const project = ctx.db.get<{ id: number; key: string }>(
-    "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+): Promise<Card[]> {
+  const project = await ctx.db.get<{ id: number; key: string }>(
+    "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
     projectKey
   );
   if (!project) {
@@ -995,13 +996,13 @@ export function listTickets(
   }
 
   if (filters.q && filters.q.trim().length > 0) {
-    const qLower = filters.q.trim().toLowerCase();
+    const q = filters.q.trim();
     sql += ` AND (
-      LOWER(? || '-' || t.number) LIKE '%' || ? || '%' OR
-      LOWER(t.title) LIKE '%' || ? || '%' OR
-      LOWER(COALESCE(t.description, '')) LIKE '%' || ? || '%'
+      (? || '-' || t.number::text) ILIKE '%' || ? || '%' OR
+      t.title ILIKE '%' || ? || '%' OR
+      COALESCE(t.description, '') ILIKE '%' || ? || '%'
     )`;
-    params.push(project.key.toLowerCase(), qLower, qLower, qLower);
+    params.push(project.key, q, q, q);
   }
 
   sql += `
@@ -1017,7 +1018,7 @@ export function listTickets(
       t.rank ASC
   `;
 
-  const rows = ctx.db.all<{
+  const rows = await ctx.db.all<{
     id: number;
     number: number;
     title: string;
@@ -1029,7 +1030,7 @@ export function listTickets(
     feature_id_val: number | null;
     feature_name: string | null;
     feature_color: string | null;
-    blocked: number;
+    blocked: number | boolean;
   }>(sql, ...params);
 
   return rows.map((r) => ({
@@ -1047,20 +1048,20 @@ export function listTickets(
           }
         : null,
     assignee: r.assignee ?? null,
-    blocked: Boolean(r.blocked),
+    blocked: r.blocked === true || r.blocked === 1,
     needsAttention: r.attention_reason ?? null,
   }));
 }
 
-export function getBoard(
+export async function getBoard(
   ctx: Ctx,
   projectKey: string,
   filters?: ListTicketsFilters
-): Board {
-  const project = getProject(ctx, projectKey);
-  const cards = listTickets(ctx, projectKey, filters);
-  const actors = listActors(ctx);
-  const features = listFeatures(ctx, projectKey);
+): Promise<Board> {
+  const project = await getProject(ctx, projectKey);
+  const cards = await listTickets(ctx, projectKey, filters);
+  const actors = await listActors(ctx);
+  const features = await listFeatures(ctx, projectKey);
 
   const columns = COLUMNS.map((col) => ({
     id: col.id,
@@ -1090,22 +1091,22 @@ export function getBoard(
   };
 }
 
-export function deleteTicket(ctx: Ctx, actor: string, ticketKey: string): void {
+export async function deleteTicket(ctx: Ctx, actor: string, ticketKey: string): Promise<void> {
   const { projectKey, ticketNumber } = parseTicketKey(ticketKey);
 
   let canonicalKey = "";
   let canonicalProjectKey = "";
 
-  const blockedDependents = ctx.db.tx(() => {
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  const blockedDependents = await ctx.db.tx(async () => {
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey
     );
     if (!project) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const row = ctx.db.get<{
+    const row = await ctx.db.get<{
       id: number;
       project_id: number;
       number: number;
@@ -1124,7 +1125,7 @@ export function deleteTicket(ctx: Ctx, actor: string, ticketKey: string): void {
     canonicalKey = `${project.key}-${row.number}`;
     canonicalProjectKey = project.key;
 
-    const blockedDependents = ctx.db.all<{ project_key: string; number: number }>(
+    const blockedDependents = await ctx.db.all<{ project_key: string; number: number }>(
       `SELECT p.key as project_key, t.number
        FROM ticket_blockers tb
        JOIN tickets t ON tb.ticket_id = t.id
@@ -1133,13 +1134,13 @@ export function deleteTicket(ctx: Ctx, actor: string, ticketKey: string): void {
       row.id
     );
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
-    ctx.db.run("DELETE FROM activity WHERE ticket_id = ?", row.id);
-    ctx.db.run("DELETE FROM comments WHERE ticket_id = ?", row.id);
-    ctx.db.run("DELETE FROM tickets WHERE id = ?", row.id);
+    await ctx.db.run("DELETE FROM activity WHERE ticket_id = ?", row.id);
+    await ctx.db.run("DELETE FROM comments WHERE ticket_id = ?", row.id);
+    await ctx.db.run("DELETE FROM tickets WHERE id = ?", row.id);
 
-    compactColumnRanks(ctx, project.id, row.column_id);
+    await compactColumnRanks(ctx, project.id, row.column_id);
 
     return blockedDependents;
   });
@@ -1162,4 +1163,3 @@ export function deleteTicket(ctx: Ctx, actor: string, ticketKey: string): void {
     });
   }
 }
-

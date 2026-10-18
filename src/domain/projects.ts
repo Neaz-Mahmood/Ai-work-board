@@ -51,14 +51,14 @@ export function deriveKey(folderName: string, existingKeys: Set<string>): string
   }
 }
 
-export function createProject(
+export async function createProject(
   ctx: Ctx,
   input: { path: string; name?: string; key?: string },
   actor: string = "agent"
-): Project {
+): Promise<Project> {
   const normPath = normalizeProjectPath(input.path);
 
-  const existingByPath = ctx.db.get<{ key: string }>(
+  const existingByPath = await ctx.db.get<{ key: string }>(
     "SELECT key FROM projects WHERE path = ?",
     normPath
   );
@@ -87,7 +87,7 @@ export function createProject(
     if (!/^[A-Z]{2,5}$/.test(uppercased)) {
       throw validation("Project key must be 2 to 5 uppercase letters");
     }
-    const existingByKey = ctx.db.get<{ id: number }>(
+    const existingByKey = await ctx.db.get<{ id: number }>(
       "SELECT id FROM projects WHERE key = ?",
       uppercased
     );
@@ -96,14 +96,14 @@ export function createProject(
     }
     projectKey = uppercased;
   } else {
-    const rows = ctx.db.all<{ key: string }>("SELECT key FROM projects");
+    const rows = await ctx.db.all<{ key: string }>("SELECT key FROM projects");
     const existingKeys = new Set(rows.map((r) => r.key));
     projectKey = deriveKey(path.basename(normPath), existingKeys);
   }
 
   const now = ctx.clock.now().toISOString();
-  ctx.db.tx(() => {
-    ctx.db.run(
+  await ctx.db.tx(async () => {
+    await ctx.db.run(
       "INSERT INTO projects (key, name, path, next_ticket_number, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)",
       projectKey,
       projectName,
@@ -131,8 +131,8 @@ export function createProject(
   return project;
 }
 
-export function listProjects(ctx: Ctx): Project[] {
-  const rows = ctx.db.all<{
+export async function listProjects(ctx: Ctx): Promise<Project[]> {
+  const rows = await ctx.db.all<{
     id: number;
     key: string;
     name: string;
@@ -141,11 +141,11 @@ export function listProjects(ctx: Ctx): Project[] {
     updated_at: string;
   }>("SELECT id, key, name, path, created_at, updated_at FROM projects ORDER BY name ASC");
 
-  const countRows = ctx.db.all<{
+  const countRows = await ctx.db.all<{
     project_id: number;
     column_id: string;
-    count: number;
-  }>("SELECT project_id, column_id, COUNT(*) as count FROM tickets GROUP BY project_id, column_id");
+    count: number | string;
+  }>("SELECT project_id, column_id, COUNT(*)::int as count FROM tickets GROUP BY project_id, column_id");
 
   const countsMap = new Map<number, Record<ColumnId, number>>();
   for (const r of countRows) {
@@ -155,7 +155,7 @@ export function listProjects(ctx: Ctx): Project[] {
       countsMap.set(r.project_id, c);
     }
     if (r.column_id in c) {
-      c[r.column_id as ColumnId] = r.count;
+      c[r.column_id as ColumnId] = Number(r.count);
     }
   }
 
@@ -175,8 +175,8 @@ export function listProjects(ctx: Ctx): Project[] {
   }));
 }
 
-export function getProject(ctx: Ctx, key: string): Project {
-  const row = ctx.db.get<{
+export async function getProject(ctx: Ctx, key: string): Promise<Project> {
+  const row = await ctx.db.get<{
     id: number;
     key: string;
     name: string;
@@ -189,8 +189,8 @@ export function getProject(ctx: Ctx, key: string): Project {
     throw notFound(`Project ${key} not found`);
   }
 
-  const countRows = ctx.db.all<{ column_id: string; count: number }>(
-    "SELECT column_id, COUNT(*) as count FROM tickets WHERE project_id = ? GROUP BY column_id",
+  const countRows = await ctx.db.all<{ column_id: string; count: number | string }>(
+    "SELECT column_id, COUNT(*)::int as count FROM tickets WHERE project_id = ? GROUP BY column_id",
     row.id
   );
 
@@ -203,7 +203,7 @@ export function getProject(ctx: Ctx, key: string): Project {
   };
   for (const r of countRows) {
     if (r.column_id in counts) {
-      counts[r.column_id as ColumnId] = r.count;
+      counts[r.column_id as ColumnId] = Number(r.count);
     }
   }
 
@@ -217,12 +217,12 @@ export function getProject(ctx: Ctx, key: string): Project {
   };
 }
 
-export function renameProject(
+export async function renameProject(
   ctx: Ctx,
   key: string,
   name: string,
   actor: string = "agent"
-): Project {
+): Promise<Project> {
   if (typeof name !== "string") {
     throw validation("Name must be a string");
   }
@@ -230,10 +230,10 @@ export function renameProject(
   if (trimmed.length === 0 || trimmed.length > 100) {
     throw validation("Project name must be between 1 and 100 characters");
   }
-  const project = getProject(ctx, key);
+  const project = await getProject(ctx, key);
   const now = ctx.clock.now().toISOString();
-  ctx.db.tx(() => {
-    ctx.db.run(
+  await ctx.db.tx(async () => {
+    await ctx.db.run(
       "UPDATE projects SET name = ?, updated_at = ? WHERE key = ?",
       trimmed,
       now,
@@ -257,14 +257,14 @@ export function renameProject(
   return updated;
 }
 
-export function deleteProject(
+export async function deleteProject(
   ctx: Ctx,
   key: string,
   actor: string = "agent"
-): void {
-  const project = getProject(ctx, key);
-  ctx.db.tx(() => {
-    ctx.db.run("DELETE FROM projects WHERE key = ?", project.key);
+): Promise<void> {
+  const project = await getProject(ctx, key);
+  await ctx.db.tx(async () => {
+    await ctx.db.run("DELETE FROM projects WHERE key = ?", project.key);
   });
 
   ctx.events.emit({
@@ -275,12 +275,12 @@ export function deleteProject(
   });
 }
 
-export function resolveProject(
+export async function resolveProject(
   ctx: Ctx,
   params: { key?: string; cwd?: string }
-): Project {
+): Promise<Project> {
   if (params.key) {
-    return getProject(ctx, params.key);
+    return await getProject(ctx, params.key);
   }
 
   if (!params.cwd) {
@@ -289,7 +289,7 @@ export function resolveProject(
 
   const normalizedCwd = normalizeProjectPath(params.cwd);
 
-  const projects = listProjects(ctx);
+  const projects = await listProjects(ctx);
   const matching = projects.filter((p) => {
     return (
       p.path === normalizedCwd ||

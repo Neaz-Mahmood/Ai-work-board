@@ -5,12 +5,12 @@ import { touchActor } from "./actors.ts";
 import { recordActivity } from "./activity.ts";
 import { getTicket, parseTicketKey } from "./tickets.ts";
 
-export function setNeedsAttention(
+export async function setNeedsAttention(
   ctx: Ctx,
   actor: string,
   ticketKey: string,
   reason: string
-): Ticket {
+): Promise<Ticket> {
   if (typeof reason !== "string") {
     throw validation("Attention reason must be a string");
   }
@@ -25,16 +25,16 @@ export function setNeedsAttention(
   let canonicalProjectKey = "";
   let canonicalTicketKey = "";
 
-  ctx.db.tx(() => {
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  await ctx.db.tx(async () => {
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey
     );
     if (!project) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const ticket = ctx.db.get<{ id: number; number: number }>(
+    const ticket = await ctx.db.get<{ id: number; number: number }>(
       "SELECT id, number FROM tickets WHERE project_id = ? AND number = ?",
       project.id,
       ticketNumber
@@ -46,18 +46,18 @@ export function setNeedsAttention(
     canonicalProjectKey = project.key;
     canonicalTicketKey = `${project.key}-${ticket.number}`;
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
     const now = ctx.clock.now().toISOString();
 
-    ctx.db.run(
+    await ctx.db.run(
       "UPDATE tickets SET attention_reason = ?, updated_at = ? WHERE id = ?",
       trimmed,
       now,
       ticket.id
     );
 
-    recordActivity(ctx, ticket.id, actor, "attention_flagged", {
+    await recordActivity(ctx, ticket.id, actor, "attention_flagged", {
       reason: trimmed,
     });
   });
@@ -70,30 +70,30 @@ export function setNeedsAttention(
     at: ctx.clock.now().toISOString(),
   });
 
-  return getTicket(ctx, canonicalTicketKey);
+  return await getTicket(ctx, canonicalTicketKey);
 }
 
-export function clearNeedsAttention(
+export async function clearNeedsAttention(
   ctx: Ctx,
   actor: string,
   ticketKey: string
-): Ticket {
+): Promise<Ticket> {
   const { projectKey, ticketNumber } = parseTicketKey(ticketKey);
 
   let canonicalProjectKey = "";
   let canonicalTicketKey = "";
   let cleared = false;
 
-  ctx.db.tx(() => {
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  await ctx.db.tx(async () => {
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey
     );
     if (!project) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const ticket = ctx.db.get<{
+    const ticket = await ctx.db.get<{
       id: number;
       number: number;
       attention_reason: string | null;
@@ -113,17 +113,17 @@ export function clearNeedsAttention(
       return;
     }
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
     const now = ctx.clock.now().toISOString();
 
-    ctx.db.run(
+    await ctx.db.run(
       "UPDATE tickets SET attention_reason = NULL, updated_at = ? WHERE id = ?",
       now,
       ticket.id
     );
 
-    recordActivity(ctx, ticket.id, actor, "attention_cleared", {
+    await recordActivity(ctx, ticket.id, actor, "attention_cleared", {
       reason: ticket.attention_reason,
     });
 
@@ -140,5 +140,5 @@ export function clearNeedsAttention(
     });
   }
 
-  return getTicket(ctx, canonicalTicketKey);
+  return await getTicket(ctx, canonicalTicketKey);
 }

@@ -45,6 +45,13 @@ One backend instance is the only writer, and every write transaction is serializ
 - `scripts/e2e-server.ts`: works unchanged with the default PGlite in its temp data dir; update it if needed.
 - Remove `better-sqlite3` and `@types/better-sqlite3` (`pnpm remove better-sqlite3 @types/better-sqlite3`), and the `allowBuilds: better-sqlite3` entry in `pnpm-workspace.yaml`.
 
+## Clarifications (added after review of tasks 04–06)
+- No table uses `COLLATE NOCASE`. Features already enforce name uniqueness through a stored `name_lower` column with `UNIQUE(project_id, name_lower)`, and `src/domain/features.ts` looks names up via `name_lower = ?` with a JS-lowercased value. Keep that column, that constraint and those lookups exactly as they are; do not add a `lower(name)` index.
+- Migrations run multi-statement SQL. Give `Db` an `exec(sql: string): Promise<void>` for that (PGlite `exec`, postgres `sql.unsafe`), used by `migrate`; domain code keeps using `get`/`all`/`run`/`tx`.
+- Do not edit `package.json`, `pnpm-lock.yaml` or `pnpm-workspace.yaml`, and do not run `pnpm remove`. The reviewer removes `better-sqlite3`, `@types/better-sqlite3` and the `allowBuilds` entry after you finish. Just make sure nothing in `src/`, `test/` or `scripts/` imports `better-sqlite3` any more.
+- Do not add any mutex other than the one in `src/server/writeMutex.ts`.
+- The `node bin/awb.js start` + `curl` check is run by the reviewer; you only need the three `pnpm` commands.
+
 ## Follow these existing patterns
 - `test/pglite-proof.test.ts`: working PGlite and `postgres` usage on this Node version.
 - `src/server/db.ts` (current): `tx` semantics. Nested calls join, and a throw rolls everything back.

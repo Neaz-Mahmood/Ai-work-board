@@ -14,7 +14,7 @@ export function registerProjectTools(
     "List all registered projects on the AI Work Board with their keys, repository paths, and ticket counts across columns.",
     {},
     async () => {
-      return withToolResult(() => listProjects(ctx));
+      return withToolResult(async () => await listProjects(ctx));
     }
   );
 
@@ -28,9 +28,9 @@ export function registerProjectTools(
       actor: z.string().optional().describe("Optional actor name performing this action (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        return createProject(
+        return await createProject(
           ctx,
           {
             path: args.path,

@@ -13,12 +13,12 @@ export type ClaimNextTicketOptions = {
   featureId?: number | null;
 };
 
-export function claimNextTicket(
+export async function claimNextTicket(
   ctx: Ctx,
   actor: string,
   projectKey: string,
   opts?: ClaimNextTicketOptions
-): Ticket | null {
+): Promise<Ticket | null> {
   if (typeof actor !== "string") {
     throw validation("Actor name must be a string");
   }
@@ -44,11 +44,9 @@ export function claimNextTicket(
     }
   }
 
-  let claimedTicket: Ticket | null = null;
-
-  claimedTicket = ctx.db.tx(() => {
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  const claimedTicket = await ctx.db.tx(async () => {
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey.trim()
     );
     if (!project) {
@@ -56,7 +54,7 @@ export function claimNextTicket(
     }
 
     if (opts?.featureId !== undefined && opts?.featureId !== null) {
-      const feat = ctx.db.get<{ id: number }>(
+      const feat = await ctx.db.get<{ id: number }>(
         "SELECT id FROM features WHERE id = ? AND project_id = ?",
         opts.featureId,
         project.id
@@ -89,7 +87,7 @@ export function claimNextTicket(
 
     sql += " ORDER BY t.rank ASC, t.id ASC LIMIT 1";
 
-    const ticketRow = ctx.db.get<{
+    const ticketRow = await ctx.db.get<{
       id: number;
       project_id: number;
       number: number;
@@ -102,24 +100,24 @@ export function claimNextTicket(
       return null;
     }
 
-    touchActor(ctx, trimmedActor);
+    await touchActor(ctx, trimmedActor);
     const now = ctx.clock.now().toISOString();
 
-    ctx.db.run(
+    await ctx.db.run(
       "UPDATE tickets SET assignee = ? WHERE id = ?",
       trimmedActor,
       ticketRow.id
     );
 
-    compactColumnRanks(ctx, project.id, "todo", ticketRow.id);
-    insertTicketAtRank(ctx, ticketRow.id, project.id, "in_progress", null, now);
+    await compactColumnRanks(ctx, project.id, "todo", ticketRow.id);
+    await insertTicketAtRank(ctx, ticketRow.id, project.id, "in_progress", null, now);
 
-    recordActivity(ctx, ticketRow.id, trimmedActor, "claimed", {
+    await recordActivity(ctx, ticketRow.id, trimmedActor, "claimed", {
       from: "todo",
       to: "in_progress",
     });
 
-    return getTicket(ctx, `${project.key}-${ticketRow.number}`);
+    return await getTicket(ctx, `${project.key}-${ticketRow.number}`);
   });
 
   if (claimedTicket) {

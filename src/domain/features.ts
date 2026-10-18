@@ -48,12 +48,12 @@ export type UpdateFeaturePatch = {
   color?: string;
 };
 
-export function createFeature(
+export async function createFeature(
   ctx: Ctx,
   actor: string,
   projectKey: string,
   input: CreateFeatureInput
-): { feature: Feature; tickets: Ticket[] } {
+): Promise<{ feature: Feature; tickets: Ticket[] }> {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw validation("Input must be an object");
   }
@@ -122,16 +122,16 @@ export function createFeature(
   let featureResult: Feature;
   const createdTickets: Ticket[] = [];
 
-  ctx.db.tx(() => {
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  await ctx.db.tx(async () => {
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey
     );
     if (!project) {
       throw notFound(`Project ${projectKey} not found`);
     }
 
-    const existing = ctx.db.get<{ id: number }>(
+    const existing = await ctx.db.get<{ id: number }>(
       "SELECT id FROM features WHERE project_id = ? AND name_lower = ?",
       project.id,
       trimmedName.toLowerCase()
@@ -140,23 +140,23 @@ export function createFeature(
       throw conflict(`A feature named ${trimmedName} already exists`);
     }
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
     let color = input.color;
     if (!color) {
-      const countRow = ctx.db.get<{ count: number }>(
-        "SELECT COUNT(*) as count FROM features WHERE project_id = ?",
+      const countRow = await ctx.db.get<{ count: number | string }>(
+        "SELECT COUNT(*)::int as count FROM features WHERE project_id = ?",
         project.id
       );
-      const count = countRow?.count ?? 0;
+      const count = countRow ? Number(countRow.count) : 0;
       color = FEATURE_PALETTE[count % FEATURE_PALETTE.length];
     }
 
     const now = ctx.clock.now().toISOString();
-    const insertResult = ctx.db.run(
+    const insertResult = await ctx.db.get<{ id: number }>(
       `INSERT INTO features (
         project_id, name, name_lower, description, color, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
       project.id,
       trimmedName,
       trimmedName.toLowerCase(),
@@ -166,7 +166,7 @@ export function createFeature(
       now
     );
 
-    const featureId = insertResult.lastInsertRowid;
+    const featureId = Number(insertResult!.id);
 
     if (input.tickets && input.tickets.length > 0) {
       for (let i = 0; i < input.tickets.length; i++) {
@@ -179,7 +179,7 @@ export function createFeature(
           ...indexBlockers,
         ];
 
-        const created = createTicketTx(ctx, actor, project.key, {
+        const created = await createTicketTx(ctx, actor, project.key, {
           title: tInput.title,
           description: tInput.description,
           column: tInput.column,
@@ -233,24 +233,24 @@ export function createFeature(
   };
 }
 
-export function listFeatures(ctx: Ctx, projectKey: string): Feature[] {
-  const project = ctx.db.get<{ id: number; key: string }>(
-    "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+export async function listFeatures(ctx: Ctx, projectKey: string): Promise<Feature[]> {
+  const project = await ctx.db.get<{ id: number; key: string }>(
+    "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
     projectKey
   );
   if (!project) {
     throw notFound(`Project ${projectKey} not found`);
   }
 
-  const rows = ctx.db.all<{
+  const rows = await ctx.db.all<{
     id: number;
     name: string;
     description: string;
     color: string;
     created_at: string;
     updated_at: string;
-    total: number;
-    done: number | null;
+    total: number | string;
+    done: number | string | null;
   }>(
     `SELECT
       f.id,
@@ -259,8 +259,8 @@ export function listFeatures(ctx: Ctx, projectKey: string): Feature[] {
       f.color,
       f.created_at,
       f.updated_at,
-      COUNT(t.id) as total,
-      SUM(CASE WHEN t.column_id = 'done' THEN 1 ELSE 0 END) as done
+      COUNT(t.id)::int as total,
+      SUM(CASE WHEN t.column_id = 'done' THEN 1 ELSE 0 END)::int as done
     FROM features f
     LEFT JOIN tickets t ON t.feature_id = f.id
     WHERE f.project_id = ?
@@ -276,20 +276,20 @@ export function listFeatures(ctx: Ctx, projectKey: string): Feature[] {
     description: r.description,
     color: r.color,
     progress: {
-      done: r.done ?? 0,
-      total: r.total ?? 0,
+      done: r.done !== null && r.done !== undefined ? Number(r.done) : 0,
+      total: r.total !== null && r.total !== undefined ? Number(r.total) : 0,
     },
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }));
 }
 
-export function getFeature(ctx: Ctx, id: number): FeatureWithTickets {
+export async function getFeature(ctx: Ctx, id: number): Promise<FeatureWithTickets> {
   if (typeof id !== "number" || !Number.isInteger(id)) {
     throw notFound(`Feature ${id} not found`);
   }
 
-  const feat = ctx.db.get<{
+  const feat = await ctx.db.get<{
     id: number;
     project_id: number;
     name: string;
@@ -303,7 +303,7 @@ export function getFeature(ctx: Ctx, id: number): FeatureWithTickets {
     throw notFound(`Feature ${id} not found`);
   }
 
-  const project = ctx.db.get<{ key: string }>(
+  const project = await ctx.db.get<{ key: string }>(
     "SELECT key FROM projects WHERE id = ?",
     feat.project_id
   );
@@ -311,7 +311,7 @@ export function getFeature(ctx: Ctx, id: number): FeatureWithTickets {
     throw notFound(`Feature ${id} not found`);
   }
 
-  const cards = listTickets(ctx, project.key, { feature: feat.id });
+  const cards = await listTickets(ctx, project.key, { feature: feat.id });
 
   const doneCount = cards.filter((c) => c.column === "done").length;
   const totalCount = cards.length;
@@ -332,12 +332,12 @@ export function getFeature(ctx: Ctx, id: number): FeatureWithTickets {
   };
 }
 
-export function updateFeature(
+export async function updateFeature(
   ctx: Ctx,
   actor: string,
   id: number,
   patch: UpdateFeaturePatch
-): Feature {
+): Promise<Feature> {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
     throw validation("Input must be an object");
   }
@@ -381,8 +381,8 @@ export function updateFeature(
   let projectKey = "";
   let changed = false;
 
-  const feature = ctx.db.tx(() => {
-    const existing = ctx.db.get<{
+  const feature = await ctx.db.tx(async () => {
+    const existing = await ctx.db.get<{
       id: number;
       project_id: number;
       name: string;
@@ -396,7 +396,7 @@ export function updateFeature(
       throw notFound(`Feature ${id} not found`);
     }
 
-    const project = ctx.db.get<{ key: string }>(
+    const project = await ctx.db.get<{ key: string }>(
       "SELECT key FROM projects WHERE id = ?",
       existing.project_id
     );
@@ -406,7 +406,7 @@ export function updateFeature(
       trimmedName !== undefined &&
       trimmedName.toLowerCase() !== existing.name.toLowerCase()
     ) {
-      const conflictFeature = ctx.db.get<{ id: number }>(
+      const conflictFeature = await ctx.db.get<{ id: number }>(
         "SELECT id FROM features WHERE project_id = ? AND name_lower = ? AND id != ?",
         existing.project_id,
         trimmedName.toLowerCase(),
@@ -417,7 +417,7 @@ export function updateFeature(
       }
     }
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
     const newName = trimmedName !== undefined ? trimmedName : existing.name;
     const newDescription =
@@ -431,7 +431,7 @@ export function updateFeature(
     ) {
       changed = true;
       const now = ctx.clock.now().toISOString();
-      ctx.db.run(
+      await ctx.db.run(
         `UPDATE features SET
           name = ?,
           name_lower = ?,
@@ -448,7 +448,7 @@ export function updateFeature(
       );
     }
 
-    const featWithTickets = getFeature(ctx, existing.id);
+    const featWithTickets = await getFeature(ctx, existing.id);
     const { tickets: _t, ...featOnly } = featWithTickets;
     return featOnly;
   });
@@ -466,12 +466,12 @@ export function updateFeature(
   return feature;
 }
 
-export function deleteFeature(ctx: Ctx, actor: string, id: number): void {
-  touchActor(ctx, actor);
+export async function deleteFeature(ctx: Ctx, actor: string, id: number): Promise<void> {
+  await touchActor(ctx, actor);
   let projectKey = "";
 
-  ctx.db.tx(() => {
-    const feature = ctx.db.get<{
+  await ctx.db.tx(async () => {
+    const feature = await ctx.db.get<{
       id: number;
       project_id: number;
       name: string;
@@ -481,28 +481,28 @@ export function deleteFeature(ctx: Ctx, actor: string, id: number): void {
       throw notFound(`Feature ${id} not found`);
     }
 
-    const project = ctx.db.get<{ key: string }>(
+    const project = await ctx.db.get<{ key: string }>(
       "SELECT key FROM projects WHERE id = ?",
       feature.project_id
     );
     projectKey = project?.key ?? "";
 
-    const linkedTickets = ctx.db.all<{ id: number }>(
+    const linkedTickets = await ctx.db.all<{ id: number }>(
       "SELECT id FROM tickets WHERE feature_id = ? ORDER BY id ASC",
       feature.id
     );
 
     const now = ctx.clock.now().toISOString();
     for (const t of linkedTickets) {
-      recordActivity(ctx, t.id, actor, "updated", {
+      await recordActivity(ctx, t.id, actor, "updated", {
         field: "feature",
         from: feature.name,
         to: null,
       });
-      ctx.db.run("UPDATE tickets SET updated_at = ? WHERE id = ?", now, t.id);
+      await ctx.db.run("UPDATE tickets SET updated_at = ? WHERE id = ?", now, t.id);
     }
 
-    ctx.db.run("DELETE FROM features WHERE id = ?", feature.id);
+    await ctx.db.run("DELETE FROM features WHERE id = ?", feature.id);
   });
 
   ctx.events.emit({

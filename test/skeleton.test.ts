@@ -20,36 +20,18 @@ describe("Walking skeleton", () => {
     }
   });
 
-  test("fresh data dir gets board.db and schema_version contains migrations", async () => {
+  test("fresh app gets schema_version containing baseline migration", async () => {
     const testApp = await makeTestApp();
     try {
-      const dbFile = path.join(testApp.dataDir, "board.db");
-      expect(fs.existsSync(dbFile)).toBe(true);
-
-      const rows = testApp.ctx.db.all<{ id: number; name: string; applied_at: string }>(
+      const rows = await testApp.ctx.db.all<{ id: number; name: string; applied_at: string }>(
         "SELECT id, name, applied_at FROM schema_version ORDER BY id ASC"
       );
-      expect(rows.length).toBe(6);
+      expect(rows.length).toBe(1);
       expect(rows[0].id).toBe(1);
-      expect(rows[0].name).toBe("init");
-      expect(rows[1].id).toBe(2);
-      expect(rows[1].name).toBe("projects");
-      expect(rows[2].id).toBe(3);
-      expect(rows[2].name).toBe("tickets");
-      expect(rows[3].id).toBe(4);
-      expect(rows[3].name).toBe("comments");
-      expect(rows[4].id).toBe(5);
-      expect(rows[4].name).toBe("blockers");
-      expect(rows[5].id).toBe(6);
-      expect(rows[5].name).toBe("features");
+      expect(rows[0].name).toBe("baseline");
       expect(typeof rows[0].applied_at).toBe("string");
-      expect(typeof rows[1].applied_at).toBe("string");
-      expect(typeof rows[2].applied_at).toBe("string");
-      expect(typeof rows[3].applied_at).toBe("string");
-      expect(typeof rows[4].applied_at).toBe("string");
-      expect(typeof rows[5].applied_at).toBe("string");
 
-      const meta = testApp.ctx.db.all("SELECT * FROM app_meta");
+      const meta = await testApp.ctx.db.all("SELECT * FROM app_meta");
       expect(meta).toEqual([]);
     } finally {
       await testApp.close();
@@ -60,13 +42,13 @@ describe("Walking skeleton", () => {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-test-reapply-"));
     try {
       const app1 = await createApp({ dataDir });
-      const count1 = app1.ctx.db.all("SELECT * FROM schema_version").length;
-      expect(count1).toBe(6);
+      const count1 = (await app1.ctx.db.all("SELECT * FROM schema_version")).length;
+      expect(count1).toBe(1);
       await app1.close();
 
       const app2 = await createApp({ dataDir });
-      const count2 = app2.ctx.db.all("SELECT * FROM schema_version").length;
-      expect(count2).toBe(6);
+      const count2 = (await app2.ctx.db.all("SELECT * FROM schema_version")).length;
+      expect(count2).toBe(1);
       await app2.close();
     } finally {
       fs.rmSync(dataDir, { recursive: true, force: true });

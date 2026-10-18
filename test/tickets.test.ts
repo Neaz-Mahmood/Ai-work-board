@@ -105,13 +105,13 @@ describe("Tickets REST API", () => {
   });
 
   test("numbers are not reused after a Ticket is deleted directly from DB", async () => {
-    const prjBRow = testApp.ctx.db.get<{ id: number }>(
+    const prjBRow = await testApp.ctx.db.get<{ id: number }>(
       "SELECT id FROM projects WHERE key = 'PRJB'"
     );
     expect(prjBRow).toBeDefined();
 
     // Delete ticket 2 directly from DB
-    testApp.ctx.db.run(
+    await testApp.ctx.db.run(
       "DELETE FROM tickets WHERE project_id = ? AND number = ?",
       prjBRow!.id,
       2

@@ -265,7 +265,7 @@ describe("Comments - REST, MCP, and CLI", () => {
     );
 
     // Verify comments exist in database
-    const commentsBefore = testApp.ctx.db.all<{ id: number }>(
+    const commentsBefore = await testApp.ctx.db.all<{ id: number }>(
       "SELECT id FROM comments WHERE id IN (?, ?)",
       c1.body.id,
       c2.body.id
@@ -277,7 +277,7 @@ describe("Comments - REST, MCP, and CLI", () => {
     expect(delRes.status).toBe(204);
 
     // Verify comments are deleted
-    const commentsAfter = testApp.ctx.db.all<{ id: number }>(
+    const commentsAfter = await testApp.ctx.db.all<{ id: number }>(
       "SELECT id FROM comments WHERE id IN (?, ?)",
       c1.body.id,
       c2.body.id

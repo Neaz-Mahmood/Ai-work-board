@@ -5,17 +5,17 @@ import { touchActor } from "./actors.ts";
 import { recordActivity } from "./activity.ts";
 import { getTicket, parseTicketKey } from "./tickets.ts";
 
-export function checkBlockerCycle(
+export async function checkBlockerCycle(
   ctx: Ctx,
   blockerTicketId: number,
   blockedTicketId: number
-): void {
+): Promise<void> {
   const visited = new Set<number>();
   const queue: number[] = [blockerTicketId];
 
   while (queue.length > 0) {
     const currId = queue.shift()!;
-    const rows = ctx.db.all<{ blocker_id: number }>(
+    const rows = await ctx.db.all<{ blocker_id: number }>(
       "SELECT blocker_id FROM ticket_blockers WHERE ticket_id = ?",
       currId
     );
@@ -32,12 +32,12 @@ export function checkBlockerCycle(
   }
 }
 
-export function addBlocker(
+export async function addBlocker(
   ctx: Ctx,
   actor: string,
   ticketKey: string,
   blockerKey: string
-): Ticket {
+): Promise<Ticket> {
   if (typeof blockerKey !== "string" || blockerKey.trim().length === 0) {
     throw validation("blockerKey is required");
   }
@@ -50,16 +50,16 @@ export function addBlocker(
   let canonicalBlockerKey = "";
   let linkAlreadyExisted = false;
 
-  ctx.db.tx(() => {
-    const tProj = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  await ctx.db.tx(async () => {
+    const tProj = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       tProjKey
     );
     if (!tProj) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const ticketRow = ctx.db.get<{ id: number; number: number; project_id: number }>(
+    const ticketRow = await ctx.db.get<{ id: number; number: number; project_id: number }>(
       "SELECT id, number, project_id FROM tickets WHERE project_id = ? AND number = ?",
       tProj.id,
       tNum
@@ -68,15 +68,15 @@ export function addBlocker(
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const bProj = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+    const bProj = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       bProjKey
     );
     if (!bProj) {
       throw notFound(`Ticket ${blockerKey} not found`);
     }
 
-    const blockerRow = ctx.db.get<{ id: number; number: number; project_id: number }>(
+    const blockerRow = await ctx.db.get<{ id: number; number: number; project_id: number }>(
       "SELECT id, number, project_id FROM tickets WHERE project_id = ? AND number = ?",
       bProj.id,
       bNum
@@ -97,7 +97,7 @@ export function addBlocker(
       throw validation("A ticket cannot block itself");
     }
 
-    const existing = ctx.db.get<{ ticket_id: number }>(
+    const existing = await ctx.db.get<{ ticket_id: number }>(
       "SELECT ticket_id FROM ticket_blockers WHERE ticket_id = ? AND blocker_id = ?",
       ticketRow.id,
       blockerRow.id
@@ -108,20 +108,20 @@ export function addBlocker(
       return;
     }
 
-    checkBlockerCycle(ctx, blockerRow.id, ticketRow.id);
+    await checkBlockerCycle(ctx, blockerRow.id, ticketRow.id);
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
-    ctx.db.run(
-      "INSERT INTO ticket_blockers (ticket_id, blocker_id) VALUES (?, ?)",
+    await ctx.db.run(
+      "INSERT INTO ticket_blockers (ticket_id, blocker_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
       ticketRow.id,
       blockerRow.id
     );
 
     const now = ctx.clock.now().toISOString();
-    ctx.db.run("UPDATE tickets SET updated_at = ? WHERE id = ?", now, ticketRow.id);
+    await ctx.db.run("UPDATE tickets SET updated_at = ? WHERE id = ?", now, ticketRow.id);
 
-    recordActivity(ctx, ticketRow.id, actor, "blocker_added", {
+    await recordActivity(ctx, ticketRow.id, actor, "blocker_added", {
       blockerKey: canonicalBlockerKey,
     });
   });
@@ -136,15 +136,15 @@ export function addBlocker(
     });
   }
 
-  return getTicket(ctx, canonicalTicketKey);
+  return await getTicket(ctx, canonicalTicketKey);
 }
 
-export function removeBlocker(
+export async function removeBlocker(
   ctx: Ctx,
   actor: string,
   ticketKey: string,
   blockerKey: string
-): Ticket {
+): Promise<Ticket> {
   if (typeof blockerKey !== "string" || blockerKey.trim().length === 0) {
     throw validation("blockerKey is required");
   }
@@ -156,16 +156,16 @@ export function removeBlocker(
   let canonicalBlockerKey = "";
   let removed = false;
 
-  ctx.db.tx(() => {
-    const tProj = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  await ctx.db.tx(async () => {
+    const tProj = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       tProjKey
     );
     if (!tProj) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const ticketRow = ctx.db.get<{ id: number; number: number }>(
+    const ticketRow = await ctx.db.get<{ id: number; number: number }>(
       "SELECT id, number FROM tickets WHERE project_id = ? AND number = ?",
       tProj.id,
       tNum
@@ -180,12 +180,12 @@ export function removeBlocker(
     let blockerRow: { id: number; number: number; key: string } | undefined;
     try {
       const { projectKey: bProjKey, ticketNumber: bNum } = parseTicketKey(blockerKey);
-      const bProj = ctx.db.get<{ id: number; key: string }>(
-        "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+      const bProj = await ctx.db.get<{ id: number; key: string }>(
+        "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
         bProjKey
       );
       if (bProj) {
-        const bTicket = ctx.db.get<{ id: number; number: number }>(
+        const bTicket = await ctx.db.get<{ id: number; number: number }>(
           "SELECT id, number FROM tickets WHERE project_id = ? AND number = ?",
           bProj.id,
           bNum
@@ -209,7 +209,7 @@ export function removeBlocker(
 
     canonicalBlockerKey = blockerRow.key;
 
-    const existing = ctx.db.get<{ ticket_id: number }>(
+    const existing = await ctx.db.get<{ ticket_id: number }>(
       "SELECT ticket_id FROM ticket_blockers WHERE ticket_id = ? AND blocker_id = ?",
       ticketRow.id,
       blockerRow.id
@@ -220,18 +220,18 @@ export function removeBlocker(
       return;
     }
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
-    ctx.db.run(
+    await ctx.db.run(
       "DELETE FROM ticket_blockers WHERE ticket_id = ? AND blocker_id = ?",
       ticketRow.id,
       blockerRow.id
     );
 
     const now = ctx.clock.now().toISOString();
-    ctx.db.run("UPDATE tickets SET updated_at = ? WHERE id = ?", now, ticketRow.id);
+    await ctx.db.run("UPDATE tickets SET updated_at = ? WHERE id = ?", now, ticketRow.id);
 
-    recordActivity(ctx, ticketRow.id, actor, "blocker_removed", {
+    await recordActivity(ctx, ticketRow.id, actor, "blocker_removed", {
       blockerKey: canonicalBlockerKey,
     });
     removed = true;
@@ -247,10 +247,10 @@ export function removeBlocker(
     });
   }
 
-  return getTicket(ctx, canonicalTicketKey);
+  return await getTicket(ctx, canonicalTicketKey);
 }
 
-export function attachBlockersOnCreate(
+export async function attachBlockersOnCreate(
   ctx: Ctx,
   actor: string,
   ticketId: number,
@@ -258,7 +258,7 @@ export function attachBlockersOnCreate(
   projectKey: string,
   ticketNumber: number,
   blockedBy: string[]
-): void {
+): Promise<void> {
   const addedBlockerIds = new Set<number>();
 
   for (const bKey of blockedBy) {
@@ -267,15 +267,15 @@ export function attachBlockersOnCreate(
     }
 
     const { projectKey: bProjKey, ticketNumber: bNum } = parseTicketKey(bKey);
-    const bProj = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+    const bProj = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       bProjKey
     );
     if (!bProj) {
       throw notFound(`Ticket ${bKey} not found`);
     }
 
-    const bTicket = ctx.db.get<{ id: number; number: number; project_id: number }>(
+    const bTicket = await ctx.db.get<{ id: number; number: number; project_id: number }>(
       "SELECT id, number, project_id FROM tickets WHERE project_id = ? AND number = ?",
       bProj.id,
       bNum
@@ -290,7 +290,7 @@ export function attachBlockersOnCreate(
 
     if (
       bTicket.id === ticketId ||
-      (bProj.key.toUpperCase() === projectKey.toUpperCase() && bTicket.number === ticketNumber)
+      (bProj.key.toLowerCase() === projectKey.toLowerCase() && bTicket.number === ticketNumber)
     ) {
       throw validation("A ticket cannot block itself");
     }
@@ -300,17 +300,17 @@ export function attachBlockersOnCreate(
       continue;
     }
 
-    checkBlockerCycle(ctx, bTicket.id, ticketId);
+    await checkBlockerCycle(ctx, bTicket.id, ticketId);
 
     addedBlockerIds.add(bTicket.id);
 
-    ctx.db.run(
-      "INSERT INTO ticket_blockers (ticket_id, blocker_id) VALUES (?, ?)",
+    await ctx.db.run(
+      "INSERT INTO ticket_blockers (ticket_id, blocker_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
       ticketId,
       bTicket.id
     );
 
-    recordActivity(ctx, ticketId, actor, "blocker_added", {
+    await recordActivity(ctx, ticketId, actor, "blocker_added", {
       blockerKey: `${bProj.key}-${bTicket.number}`,
     });
   }

@@ -3,6 +3,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { serve } from "@hono/node-server";
+import postgres from "postgres";
 import type { Hono } from "hono";
 import type { Clock } from "../src/server/clock.ts";
 import type { Ctx } from "../src/domain/context.ts";
@@ -35,9 +36,25 @@ export type TestApp = {
 
 export async function makeTestApp(opts?: Partial<AppOptions>): Promise<TestApp> {
   const dataDir = opts?.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "awb-test-"));
+
+  let dropSchema: string | undefined;
+  let postgresUrl: string | undefined;
+  let database: AppOptions["database"] = opts?.database;
+
+  if (!database) {
+    if (process.env.TEST_DATABASE_URL) {
+      postgresUrl = process.env.TEST_DATABASE_URL;
+      dropSchema = `awb_test_${Math.random().toString(36).slice(2, 10)}`;
+      database = { kind: "postgres", url: postgresUrl, schema: dropSchema };
+    } else {
+      database = { kind: "pglite" };
+    }
+  }
+
   const created = await createApp({
     dataDir,
     clock: fixedClock(),
+    database,
     ...opts,
   });
 
@@ -80,6 +97,14 @@ export async function makeTestApp(opts?: Partial<AppOptions>): Promise<TestApp> 
 
   const close = async (): Promise<void> => {
     await created.close();
+    if (dropSchema && postgresUrl) {
+      const adminSql = postgres(postgresUrl, { max: 1 });
+      try {
+        await adminSql.unsafe(`DROP SCHEMA IF EXISTS "${dropSchema}" CASCADE`);
+      } finally {
+        await adminSql.end();
+      }
+    }
     fs.rmSync(dataDir, { recursive: true, force: true });
   };
 

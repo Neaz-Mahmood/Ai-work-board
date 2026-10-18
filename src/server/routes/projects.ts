@@ -14,8 +14,8 @@ import {
 export function createProjectsRoute(ctx: Ctx): Hono {
   const router = new Hono();
 
-  router.get("/", (c) => {
-    const list = listProjects(ctx);
+  router.get("/", async (c) => {
+    const list = await listProjects(ctx);
     return c.json(list);
   });
 
@@ -44,7 +44,7 @@ export function createProjectsRoute(ctx: Ctx): Hono {
     }
 
     const actor = restActor(c.req.header("X-AWB-Actor"));
-    const project = createProject(
+    const project = await createProject(
       ctx,
       {
         path: body.path,
@@ -57,16 +57,16 @@ export function createProjectsRoute(ctx: Ctx): Hono {
     return c.json(project, 201);
   });
 
-  router.get("/resolve", (c) => {
+  router.get("/resolve", async (c) => {
     const cwd = c.req.query("cwd");
     const key = c.req.query("key");
-    const project = resolveProject(ctx, { cwd, key });
+    const project = await resolveProject(ctx, { cwd, key });
     return c.json(project);
   });
 
-  router.get("/:key", (c) => {
+  router.get("/:key", async (c) => {
     const key = c.req.param("key");
-    const project = getProject(ctx, key);
+    const project = await getProject(ctx, key);
     return c.json(project);
   });
 
@@ -88,14 +88,14 @@ export function createProjectsRoute(ctx: Ctx): Hono {
     }
 
     const actor = restActor(c.req.header("X-AWB-Actor"));
-    const project = renameProject(ctx, key, body.name, actor);
+    const project = await renameProject(ctx, key, body.name, actor);
     return c.json(project);
   });
 
-  router.delete("/:key", (c) => {
+  router.delete("/:key", async (c) => {
     const key = c.req.param("key");
     const actor = restActor(c.req.header("X-AWB-Actor"));
-    deleteProject(ctx, key, actor);
+    await deleteProject(ctx, key, actor);
     return c.body(null, 204);
   });
 

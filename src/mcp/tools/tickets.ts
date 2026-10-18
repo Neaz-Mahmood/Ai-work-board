@@ -30,9 +30,9 @@ export function registerTicketTools(
       cwd: z.string().optional().describe("Optional absolute, symlink-resolved path of the repository on the agent's machine used to resolve the project when project key is omitted (deepest match wins)"),
     },
     async (args) => {
-      return withToolResult(() => {
-        const project = resolveProject(ctx, { key: args.project, cwd: args.cwd });
-        return getBoard(ctx, project.key);
+      return withToolResult(async () => {
+        const project = await resolveProject(ctx, { key: args.project, cwd: args.cwd });
+        return await getBoard(ctx, project.key);
       });
     }
   );
@@ -49,9 +49,9 @@ export function registerTicketTools(
       featureId: z.number().int().optional().describe("Optional feature ID to filter tickets belonging to a specific feature"),
     },
     async (args) => {
-      return withToolResult(() => {
-        const project = resolveProject(ctx, { key: args.project, cwd: args.cwd });
-        return listTickets(ctx, project.key, {
+      return withToolResult(async () => {
+        const project = await resolveProject(ctx, { key: args.project, cwd: args.cwd });
+        return await listTickets(ctx, project.key, {
           column: args.column as ColumnId | undefined,
           assignee: args.assignee,
           q: args.query,
@@ -68,8 +68,8 @@ export function registerTicketTools(
       ticketKey: z.string().describe("Ticket key identifier (e.g. AWB-1)"),
     },
     async (args) => {
-      return withToolResult(() => {
-        return getTicket(ctx, args.ticketKey);
+      return withToolResult(async () => {
+        return await getTicket(ctx, args.ticketKey);
       });
     }
   );
@@ -90,10 +90,10 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name creating the ticket (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        const project = resolveProject(ctx, { key: args.project, cwd: args.cwd });
-        return createTicket(ctx, actor, project.key, {
+        const project = await resolveProject(ctx, { key: args.project, cwd: args.cwd });
+        return await createTicket(ctx, actor, project.key, {
           title: args.title,
           description: args.description,
           column: args.column as ColumnId | undefined,
@@ -119,7 +119,7 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name performing the update (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
         const patch: Record<string, unknown> = {};
         if (args.title !== undefined) patch.title = args.title;
@@ -127,7 +127,7 @@ export function registerTicketTools(
         if (args.priority !== undefined) patch.priority = args.priority as Priority;
         if (args.assignee !== undefined) patch.assignee = args.assignee;
         if (args.featureId !== undefined) patch.featureId = args.featureId;
-        return updateTicket(ctx, actor, args.ticketKey, patch);
+        return await updateTicket(ctx, actor, args.ticketKey, patch);
       });
     }
   );
@@ -142,9 +142,9 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name moving the ticket (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        return moveTicket(ctx, actor, args.ticketKey, {
+        return await moveTicket(ctx, actor, args.ticketKey, {
           column: args.column as ColumnId,
           position: args.position,
         });
@@ -161,9 +161,9 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name adding the comment (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        return addComment(ctx, actor, args.ticketKey, args.body);
+        return await addComment(ctx, actor, args.ticketKey, args.body);
       });
     }
   );
@@ -177,9 +177,9 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name adding the blocker (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        return addBlocker(ctx, actor, args.ticketKey, args.blockerKey);
+        return await addBlocker(ctx, actor, args.ticketKey, args.blockerKey);
       });
     }
   );
@@ -193,9 +193,9 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name removing the blocker (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        return removeBlocker(ctx, actor, args.ticketKey, args.blockerKey);
+        return await removeBlocker(ctx, actor, args.ticketKey, args.blockerKey);
       });
     }
   );
@@ -209,9 +209,9 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name flagging the ticket (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        return setNeedsAttention(ctx, actor, args.ticketKey, args.reason);
+        return await setNeedsAttention(ctx, actor, args.ticketKey, args.reason);
       });
     }
   );
@@ -224,9 +224,9 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name clearing the flag (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        return clearNeedsAttention(ctx, actor, args.ticketKey);
+        return await clearNeedsAttention(ctx, actor, args.ticketKey);
       });
     }
   );
@@ -241,10 +241,10 @@ export function registerTicketTools(
       actor: z.string().optional().describe("Optional actor name claiming the ticket (e.g. agent name; 'you' is reserved for UI)"),
     },
     async (args) => {
-      return withToolResult(() => {
+      return withToolResult(async () => {
         const actor = actorFor(args.actor, urlActor);
-        const project = resolveProject(ctx, { key: args.project, cwd: args.cwd });
-        const ticket = claimNextTicket(ctx, actor, project.key, {
+        const project = await resolveProject(ctx, { key: args.project, cwd: args.cwd });
+        const ticket = await claimNextTicket(ctx, actor, project.key, {
           featureId: args.featureId,
         });
         return { ticket };

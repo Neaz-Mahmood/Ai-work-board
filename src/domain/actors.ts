@@ -28,7 +28,7 @@ export function actorColor(name: string): string {
   return ACTOR_PALETTE[hash % ACTOR_PALETTE.length];
 }
 
-export function touchActor(ctx: Ctx, name: string): Actor {
+export async function touchActor(ctx: Ctx, name: string): Promise<Actor> {
   if (typeof name !== "string") {
     throw validation("Actor name must be a string");
   }
@@ -39,7 +39,7 @@ export function touchActor(ctx: Ctx, name: string): Actor {
     );
   }
 
-  const existing = ctx.db.get<{ name: string; color: string }>(
+  const existing = await ctx.db.get<{ name: string; color: string }>(
     "SELECT name, color FROM actors WHERE name = ?",
     trimmed
   );
@@ -49,8 +49,8 @@ export function touchActor(ctx: Ctx, name: string): Actor {
 
   const color = actorColor(trimmed);
   const now = ctx.clock.now().toISOString();
-  ctx.db.run(
-    "INSERT INTO actors (name, color, first_seen_at) VALUES (?, ?, ?)",
+  await ctx.db.run(
+    "INSERT INTO actors (name, color, first_seen_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
     trimmed,
     color,
     now
@@ -59,8 +59,8 @@ export function touchActor(ctx: Ctx, name: string): Actor {
   return { name: trimmed, color };
 }
 
-export function listActors(ctx: Ctx): Actor[] {
-  const rows = ctx.db.all<{ name: string; color: string }>(
+export async function listActors(ctx: Ctx): Promise<Actor[]> {
+  const rows = await ctx.db.all<{ name: string; color: string }>(
     "SELECT name, color FROM actors ORDER BY name ASC"
   );
   return rows.map((r) => ({ name: r.name, color: r.color }));

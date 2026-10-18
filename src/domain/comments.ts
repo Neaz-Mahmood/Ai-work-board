@@ -5,12 +5,12 @@ import { touchActor } from "./actors.ts";
 import { recordActivity } from "./activity.ts";
 import { parseTicketKey } from "./tickets.ts";
 
-export function addComment(
+export async function addComment(
   ctx: Ctx,
   actor: string,
   ticketKey: string,
   body: string
-): Comment {
+): Promise<Comment> {
   if (typeof body !== "string") {
     throw validation("Comment body must be a string");
   }
@@ -22,16 +22,16 @@ export function addComment(
 
   const { projectKey, ticketNumber } = parseTicketKey(ticketKey);
 
-  const { comment, canonicalProjectKey, canonicalTicketKey } = ctx.db.tx(() => {
-    const project = ctx.db.get<{ id: number; key: string }>(
-      "SELECT id, key FROM projects WHERE UPPER(key) = UPPER(?)",
+  const { comment, canonicalProjectKey, canonicalTicketKey } = await ctx.db.tx(async () => {
+    const project = await ctx.db.get<{ id: number; key: string }>(
+      "SELECT id, key FROM projects WHERE lower(key) = lower(?)",
       projectKey
     );
     if (!project) {
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    const ticket = ctx.db.get<{ id: number; number: number }>(
+    const ticket = await ctx.db.get<{ id: number; number: number }>(
       "SELECT id, number FROM tickets WHERE project_id = ? AND number = ?",
       project.id,
       ticketNumber
@@ -40,26 +40,26 @@ export function addComment(
       throw notFound(`Ticket ${ticketKey} not found`);
     }
 
-    touchActor(ctx, actor);
+    await touchActor(ctx, actor);
 
     const now = ctx.clock.now().toISOString();
 
-    const insertResult = ctx.db.run(
-      "INSERT INTO comments (ticket_id, actor, body, created_at) VALUES (?, ?, ?, ?)",
+    const insertResult = await ctx.db.get<{ id: number }>(
+      "INSERT INTO comments (ticket_id, actor, body, created_at) VALUES (?, ?, ?, ?) RETURNING id",
       ticket.id,
       actor,
       trimmedBody,
       now
     );
-    const commentId = insertResult.lastInsertRowid;
+    const commentId = Number(insertResult!.id);
 
-    ctx.db.run(
+    await ctx.db.run(
       "UPDATE tickets SET updated_at = ? WHERE id = ?",
       now,
       ticket.id
     );
 
-    recordActivity(ctx, ticket.id, actor, "commented", { commentId });
+    await recordActivity(ctx, ticket.id, actor, "commented", { commentId });
 
     const comment: Comment = {
       id: commentId,
@@ -86,8 +86,8 @@ export function addComment(
   return comment;
 }
 
-export function listComments(ctx: Ctx, ticketId: number): Comment[] {
-  const rows = ctx.db.all<{
+export async function listComments(ctx: Ctx, ticketId: number): Promise<Comment[]> {
+  const rows = await ctx.db.all<{
     id: number;
     actor: string;
     body: string;
@@ -98,7 +98,7 @@ export function listComments(ctx: Ctx, ticketId: number): Comment[] {
   );
 
   return rows.map((r) => ({
-    id: r.id,
+    id: Number(r.id),
     actor: r.actor,
     body: r.body,
     createdAt: r.created_at,

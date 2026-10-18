@@ -55,15 +55,15 @@ describe("Ticket Deletion and Detail tests", () => {
     await testApp.request("PATCH", "/api/tickets/DEL-2", { title: "Ticket 2 Updated" }, "alice");
 
     // Verify DEL-2 has activity
-    const row2 = testApp.ctx.db.get<{ id: number }>(
+    const row2 = await testApp.ctx.db.get<{ id: number }>(
       "SELECT id FROM tickets WHERE project_id = (SELECT id FROM projects WHERE key = 'DEL') AND number = 2"
     );
     expect(row2).toBeDefined();
-    const activityCountBefore = testApp.ctx.db.get<{ count: number }>(
+    const activityCountBefore = await testApp.ctx.db.get<{ count: number | string }>(
       "SELECT COUNT(*) as count FROM activity WHERE ticket_id = ?",
       row2!.id
     );
-    expect(activityCountBefore?.count).toBeGreaterThan(0);
+    expect(Number(activityCountBefore?.count)).toBeGreaterThan(0);
 
     // Subscribe to SSE events to check ticket.deleted event
     const sseRes = await testApp.app.request("/api/events?project=DEL");
@@ -92,11 +92,11 @@ describe("Ticket Deletion and Detail tests", () => {
     expect(delAgainRes.status).toBe(404);
 
     // 4. Activity is gone
-    const activityCountAfter = testApp.ctx.db.get<{ count: number }>(
+    const activityCountAfter = await testApp.ctx.db.get<{ count: number | string }>(
       "SELECT COUNT(*) as count FROM activity WHERE ticket_id = ?",
       row2!.id
     );
-    expect(activityCountAfter?.count).toBe(0);
+    expect(Number(activityCountAfter?.count)).toBe(0);
 
     // 5. Ranks of remaining tickets in that column are dense 0..n-1
     const remainingCards = await testApp.request("GET", "/api/projects/DEL/tickets?column=backlog");
