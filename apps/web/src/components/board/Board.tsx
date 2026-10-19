@@ -19,6 +19,7 @@ import { useMoveTicket, subscribeToast } from "../../api/tickets.ts";
 import type { BoardFilters } from "../../api/board.ts";
 import { Column } from "./Column.tsx";
 import { TicketCard } from "./TicketCard.tsx";
+import { getDropDestination } from "./boardDnd.ts";
 import "./board.css";
 
 export type BoardProps = {
@@ -27,58 +28,6 @@ export type BoardProps = {
   isFiltered?: boolean;
   filters?: BoardFilters;
 };
-
-function computeUnfilteredPosition(
-  activeCard: Card,
-  targetColTickets: Card[],
-  overIndex: number,
-  isSameCol: boolean,
-  activeIndex: number
-): number | undefined {
-  if (targetColTickets.length === 0) {
-    return undefined;
-  }
-
-  // Dropped on column body or at the bottom
-  if (overIndex >= targetColTickets.length) {
-    const cardAbove = targetColTickets[targetColTickets.length - 1];
-    if (isSameCol && activeCard.rank < cardAbove.rank) {
-      return cardAbove.rank;
-    }
-    return cardAbove.rank + 1;
-  }
-
-  if (isSameCol) {
-    if (activeIndex === overIndex) {
-      return undefined; // no move
-    }
-    if (activeIndex < overIndex) {
-      // Dragging downwards over card at overIndex: dropped under targetColTickets[overIndex]
-      const cardAbove = targetColTickets[overIndex];
-      return cardAbove.rank;
-    } else {
-      // Dragging upwards over card at overIndex: dropped before targetColTickets[overIndex]
-      if (overIndex === 0) {
-        // Dropped at the top: before the visible card above it
-        return targetColTickets[0].rank;
-      } else {
-        // Dropped under targetColTickets[overIndex - 1]
-        const cardAbove = targetColTickets[overIndex - 1];
-        return cardAbove.rank + 1;
-      }
-    }
-  } else {
-    // From another column
-    if (overIndex === 0) {
-      // Dropped at the top: before targetColTickets[0]
-      return targetColTickets[0].rank;
-    } else {
-      // Dropped before targetColTickets[overIndex] -> directly after targetColTickets[overIndex - 1]
-      const cardAbove = targetColTickets[overIndex - 1];
-      return cardAbove.rank + 1;
-    }
-  }
-}
 
 export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps) {
   const [activeTicket, setActiveTicket] = useState<Card | null>(null);
@@ -182,38 +131,16 @@ export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps)
     // Case 1: Dropped onto a column directly (e.g. empty column or column body)
     const targetColAsCol = board.columns.find((c) => c.id === overId);
     if (targetColAsCol) {
-      const targetColId = targetColAsCol.id;
-      const isSameCol = sourceColId === targetColId;
-      if (isSameCol) {
-        const bottomIndex = targetColAsCol.tickets.length - 1;
-        if (activeIndex !== bottomIndex) {
-          const pos = computeUnfilteredPosition(
-            activeCard,
-            targetColAsCol.tickets,
-            targetColAsCol.tickets.length,
-            true,
-            activeIndex
-          );
-          if (pos !== undefined) {
-            moveTicket.mutate({
-              ticketKey: activeKey,
-              column: targetColId,
-              position: pos,
-            });
-          }
-        }
-      } else {
-        const pos = computeUnfilteredPosition(
-          activeCard,
-          targetColAsCol.tickets,
-          targetColAsCol.tickets.length,
-          false,
-          activeIndex
-        );
+      const dest = getDropDestination({
+        activeCard,
+        columns: board.columns,
+        target: { kind: "column", columnId: targetColAsCol.id },
+      });
+      if (dest) {
         moveTicket.mutate({
           ticketKey: activeKey,
-          column: targetColId,
-          position: pos,
+          column: dest.column,
+          position: dest.position,
         });
       }
       return;
@@ -224,29 +151,21 @@ export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps)
       c.tickets.some((t) => t.key === overId)
     );
     if (targetColWithCard) {
-      const targetColId = targetColWithCard.id;
-      const isSameCol = sourceColId === targetColId;
+      const isSameCol = sourceColId === targetColWithCard.id;
       const overIndex = targetColWithCard.tickets.findIndex(
         (t) => t.key === overId
       );
-
-      if (isSameCol && activeIndex === overIndex) {
-        return;
-      }
-
-      const pos = computeUnfilteredPosition(
+      const edge = isSameCol && activeIndex < overIndex ? "bottom" : "top";
+      const dest = getDropDestination({
         activeCard,
-        targetColWithCard.tickets,
-        overIndex,
-        isSameCol,
-        activeIndex
-      );
-
-      if (pos !== undefined) {
+        columns: board.columns,
+        target: { kind: "card", cardKey: overId, edge },
+      });
+      if (dest) {
         moveTicket.mutate({
           ticketKey: activeKey,
-          column: targetColId,
-          position: pos,
+          column: dest.column,
+          position: dest.position,
         });
       }
       return;

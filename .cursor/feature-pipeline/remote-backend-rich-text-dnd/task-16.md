@@ -40,7 +40,6 @@ This task extracts that mapping into a pure, edge-based function with tests, and
   - Translate dnd-kit's result into a `DropTarget`: a card target where `activeIndex < overIndex` in the same Column → `bottom`; otherwise → `top`; a Column target → `column`. The behaviour must stay identical.
 
 ## Follow these existing patterns
-- `/Users/neazmahmood/Desktop/projects/web/viva-os/viva-os-ui/apps/project-management/src/features/board/board-dnd.ts` (`getCardDestinationIndex`) and `board-dnd.test.ts`: an edge-based destination function and its tests.
 - `apps/web/src/components/board/Board.tsx` `computeUnfilteredPosition`: the exact current Rank arithmetic to preserve.
 
 ## Do not
@@ -53,3 +52,28 @@ This task extracts that mapping into a pure, edge-based function with tests, and
 - `pnpm test` passes
 - `pnpm typecheck` passes
 - `pnpm test:e2e` passes
+
+## Clarifications (checked against the code)
+- **Don't read any file outside this repository** (no viva-os paths). Reading one aborts your run.
+- **Types:** `Card` and `ColumnId` come from `@awb/shared/types.ts` (`import type`). `Card` has `key`, `column` and `rank`, where `rank` is the full-column Rank. `columns[i].tickets` are the visible cards in Rank order.
+- **Exact rules.** Let `vis` = the visible cards of the target Column, and `A` = the active card. "Same" means `target column === A.column`.
+  1. **Card target `X`:**
+     - `X.key === A.key` → `null`.
+     - Bottom edge → "after `X`".
+     - Top edge: if `X` is the first card of `vis` → "before first"; otherwise → "after `P`", where `P` is the visible card immediately above `X`. If `P.key === A.key` (dropping on the top edge of the card right below you), → `null`.
+  2. **"After `C`":** position = `C.rank` if same Column and `A.rank < C.rank` (A is removed from above); otherwise `C.rank + 1`.
+  3. **"Before first" (`F = vis[0]`):** position = `F.rank`.
+  4. **Column-body target:**
+     - `vis` empty → `{ column, position: undefined }` (bottom).
+     - Same Column and `A` is the last card of `vis` → `null`.
+     - Otherwise → "after last card of `vis`" (rule 2).
+  5. **Final no-op check:** same Column and computed `position === A.rank` → `null`.
+- **Why this matches today.** `computeUnfilteredPosition` plus `handleDragEnd`, under the dnd-kit translation in the Do list, reduce to exactly these rules:
+  - same Column moving down onto `X` → bottom of `X` → `X.rank`;
+  - same Column moving up onto `X` → top of `X` → `vis[0].rank` if `X` is first, else `prev.rank + 1`;
+  - other Column onto `X` → top of `X`;
+  - Column body → rule 4. A cross-Column drop on an empty Column still calls `moveTicket.mutate` with `position: undefined`, as today.
+
+  Keep `handleDragEnd`'s early returns (`!over`, unknown card/column). Call `moveTicket.mutate` exactly when `getDropDestination` returns non-null.
+- **Tests:** one `describe`, with a small `card(key, column, rank)` factory. Include the gap cases: visible ranks 0, 3, 7, with the active card at rank 3 moving to the bottom edge of rank 7 → `7`; and from another Column onto the top edge of the rank-7 card → `3 + 1 = 4`. For every rule above, also assert at least one dnd-kit-equivalent case against a hand-computed value from the old `computeUnfilteredPosition` logic, with a one-line comment.
+- Run `pnpm test`, `pnpm typecheck` and `pnpm test:e2e` (the drag e2e tests 2 and 3 in `e2e/board.spec.ts` must pass unchanged). Don't edit `e2e/`. Don't add sleeps, locks or mutexes.
