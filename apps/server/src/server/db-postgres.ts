@@ -10,6 +10,8 @@ export async function openPostgres(
 ): Promise<Db & { close(): Promise<void> }> {
   const schema = opts?.schema;
   const sql = postgres(url, {
+    // Migrations use IF NOT EXISTS; don't print the resulting NOTICEs on every start.
+    onnotice: () => {},
     ...(schema ? { connection: { search_path: schema } } : {}),
   });
 
