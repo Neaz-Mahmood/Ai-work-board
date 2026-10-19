@@ -9,6 +9,7 @@ import {
 } from "../../api/features.ts";
 import { Modal } from "../Modal.tsx";
 import { Markdown } from "../Markdown.tsx";
+import { MarkdownEditor } from "../editor/MarkdownEditor.tsx";
 import "./features.css";
 
 export type FeaturesPanelProps = {
@@ -31,6 +32,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [descDraft, setDescDraft] = useState("");
+  const [descDirty, setDescDirty] = useState(false);
   const [colorDraft, setColorDraft] = useState<string>(FEATURE_PALETTE[0]);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -38,6 +40,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
   const [featureToDelete, setFeatureToDelete] = useState<Feature | null>(null);
 
   const drawerRef = useRef<HTMLElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -45,6 +48,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
       setFormMode("closed");
       setEditingFeature(null);
       setFeatureToDelete(null);
+      setDescDirty(false);
       return;
     }
 
@@ -95,6 +99,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
     setEditingFeature(null);
     setNameDraft("");
     setDescDraft("");
+    setDescDirty(false);
     setColorDraft(FEATURE_PALETTE[0]);
     setFormError(null);
     setFormMode("create");
@@ -104,6 +109,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
     setEditingFeature(feat);
     setNameDraft(feat.name);
     setDescDraft(feat.description ?? "");
+    setDescDirty(false);
     setColorDraft(feat.color ?? FEATURE_PALETTE[0]);
     setFormError(null);
     setFormMode("edit");
@@ -112,6 +118,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
   const handleCancelForm = () => {
     setFormMode("closed");
     setEditingFeature(null);
+    setDescDirty(false);
     setFormError(null);
   };
 
@@ -134,6 +141,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
         {
           onSuccess: () => {
             setFormMode("closed");
+            setDescDirty(false);
             setFormError(null);
           },
           onError: (err) => {
@@ -142,20 +150,24 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
         }
       );
     } else if (formMode === "edit" && editingFeature) {
+      const patch: { name: string; color: string; description?: string } = {
+        name: trimmedName,
+        color: colorDraft,
+      };
+      if (descDirty) {
+        patch.description = descDraft;
+      }
       updateFeature.mutate(
         {
           id: editingFeature.id,
           projectKey,
-          patch: {
-            name: trimmedName,
-            description: descDraft,
-            color: colorDraft,
-          },
+          patch,
         },
         {
           onSuccess: () => {
             setFormMode("closed");
             setEditingFeature(null);
+            setDescDirty(false);
             setFormError(null);
           },
           onError: (err) => {
@@ -217,7 +229,7 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
           )}
 
           {formMode !== "closed" && (
-            <form className="feature-form-panel" onSubmit={handleSubmitForm}>
+            <form ref={formRef} className="feature-form-panel" onSubmit={handleSubmitForm}>
               <h3 className="feature-form-title">
                 {formMode === "create" ? "Create feature" : "Edit feature"}
               </h3>
@@ -245,15 +257,18 @@ export function FeaturesPanel({ isOpen, onClose, projectKey }: FeaturesPanelProp
               </div>
 
               <div className="feature-form-field">
-                <label htmlFor="feature-desc-input" className="feature-form-label">
-                  Description
-                </label>
-                <textarea
-                  id="feature-desc-input"
-                  value={descDraft}
-                  onChange={(e) => setDescDraft(e.target.value)}
+                <span className="feature-form-label">Description</span>
+                <MarkdownEditor
+                  key={formMode === "edit" ? `edit-${editingFeature?.id}` : "create"}
+                  initialMarkdown={descDraft}
+                  onChange={(md) => {
+                    setDescDraft(md);
+                    setDescDirty(true);
+                  }}
+                  onSave={() => formRef.current?.requestSubmit()}
+                  onCancel={handleCancelForm}
                   placeholder="Description (Markdown supported)"
-                  rows={4}
+                  ariaLabel="Feature description"
                 />
               </div>
 

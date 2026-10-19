@@ -208,4 +208,90 @@ const x = 1;
     const ticketAfterSave = await getTicket(request, ticket.key);
     expect(ticketAfterSave.description).toContain("updated text");
   });
+
+  test("5. Feature description rich text formatting and untouched description preservation", async ({
+    page,
+    request,
+  }) => {
+    const project = await createProject(request);
+
+    await page.goto(`/projects/${project.key}`);
+
+    // Open the panel with the "Features" button on the Board page, then "Create feature"
+    await page.getByRole("button", { name: "Features" }).click();
+    await expect(page.locator(".features-drawer")).toBeVisible();
+
+    await page.getByRole("button", { name: "Create feature" }).click();
+    await expect(page.locator(".feature-form-panel")).toBeVisible();
+
+    // Type a name
+    await page.getByPlaceholder("Feature name").fill("Test Feature");
+
+    // Type and format in [aria-label="Feature description"] using toolbar buttons ("Bold", "Bullet list")
+    const editor = page.locator('[aria-label="Feature description"]');
+    await expect(editor).toBeVisible();
+    await editor.click();
+
+    await page.getByRole("button", { name: "Bold" }).click();
+    await page.keyboard.type("Bold text");
+    await page.getByRole("button", { name: "Bold" }).click();
+    await page.keyboard.press("Enter");
+
+    await page.getByRole("button", { name: "Bullet list" }).click();
+    await page.keyboard.type("Bullet item");
+
+    // Click "Create"
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await expect(page.locator(".feature-form-panel")).not.toBeVisible();
+
+    // Find the id via GET /api/projects/<key>/features
+    await expect.poll(async () => {
+      const res = await request.get(`/api/projects/${project.key}/features`);
+      if (!res.ok()) return 0;
+      const list = await res.json();
+      return list.length;
+    }).toBe(1);
+
+    const featuresRes = await request.get(`/api/projects/${project.key}/features`);
+    const features = await featuresRes.json();
+    const featureId = features[0].id;
+
+    // Read back with request.get("/api/features/<id>"). The description contains ** and - .
+    const featureRes = await request.get(`/api/features/${featureId}`);
+    expect(featureRes.ok()).toBeTruthy();
+    const featureData = await featureRes.json();
+    expect(featureData.description).toContain("**");
+    expect(featureData.description).toContain("- ");
+    expect(featureData.description).toContain("**Bold text**");
+    expect(featureData.description).toContain("- Bullet item");
+
+    // Capture PATCH request body
+    let patchBody: Record<string, unknown> | null = null;
+    page.on("request", (req) => {
+      if (req.method() === "PATCH" && req.url().includes(`/api/features/${featureId}`)) {
+        patchBody = req.postDataJSON();
+      }
+    });
+
+    // Open that Feature's edit form
+    await page.getByRole("button", { name: /Edit feature/i }).click();
+    await expect(page.locator(".feature-form-panel")).toBeVisible();
+
+    // Change only the name, and Save
+    await page.getByPlaceholder("Feature name").fill("Renamed Feature");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.locator(".feature-form-panel")).not.toBeVisible();
+
+    // Check that the PATCH request body has no description key
+    await expect.poll(() => patchBody).not.toBeNull();
+    expect("description" in (patchBody ?? {})).toBe(false);
+
+    // The stored description is byte-identical to before
+    const updatedRes = await request.get(`/api/features/${featureId}`);
+    expect(updatedRes.ok()).toBeTruthy();
+    const updatedData = await updatedRes.json();
+    expect(updatedData.name).toBe("Renamed Feature");
+    expect(updatedData.description).toBe(featureData.description);
+  });
 });
+

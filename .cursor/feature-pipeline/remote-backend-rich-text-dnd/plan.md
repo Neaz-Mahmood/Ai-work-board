@@ -18,7 +18,7 @@ Tasks 04–06 keep the approved batches, but each batch's contents are ordered c
 - [12] Frontend on its own origin: API URL, CORS, login screen — blocked by: 11 — status: done ✅ (agy; no fix rounds; Claude added Clarifications (CORS before auth, session gate, 401 loop guard, hosted e2e API context) and simplified useLogout to avoid QueryCache.add internals)
 - [13] Docker image and hosting docs — blocked by: 12 — status: done ✅ (agy; no fix rounds; Claude added Clarifications (no corepack on Node 26, /data volume, explicit manifest copies), fixed two README errors, and ran docker build + hosted container smoke incl. volume persistence)
 - [14] Rich text editor for Ticket descriptions — blocked by: 11 — status: done ✅ (agy, 1 fix round: task-list input rule via chain commands, single Escape handler, scoped CSS. Attempt 1 aborted reading outside-repo reference files. Claude installed Tiptap at 3.32.0 (not 3.27.1, to avoid mixed versions), restored a missing `}` in TicketModal.css that broke drag e2e, and reverted an unrelated sleep agy added to dragCard)
-- [15] Feature descriptions use the rich text editor — blocked by: 14 — status: pending
+- [15] Feature descriptions use the rich text editor — blocked by: 14 — status: done ✅ (agy; no fix rounds; Claude added Clarifications (no second toolbar, editor key per form open, omit description from PATCH when untouched, requestSubmit for Cmd/Ctrl+Enter))
 - [16] Prefactor: pure drag-and-drop destination function — blocked by: 11 — status: pending
 - [17] Switch the Board to Pragmatic drag-and-drop — blocked by: 16 — status: pending
 - [18] Quiet drags: one refetch after a drop — blocked by: 17 — status: pending

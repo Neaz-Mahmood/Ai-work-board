@@ -270,6 +270,10 @@
   background-color: var(--color-surface, #F7F8F9);
 }
 
+.feature-form-panel .markdown-editor-content {
+  min-height: 100px;
+}
+
 .feature-form-title {
   margin: 0;
   font-size: var(--font-size-base, 14px);
