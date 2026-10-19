@@ -33,3 +33,19 @@ This task ships a platform-agnostic Docker image for the backend and documents h
 ## Done when
 - If Docker is available: `docker build -t awb .` succeeds. Then `docker run --rm -e AWB_OWNER_PASSWORD_HASH=$(node apps/server/bin/awb.js hash-password x) -e AWB_SESSION_SECRET=s -e AWB_API_TOKENS=t -p 4747:4747 awb` serves `curl localhost:4747/api/health`, and `curl -H "Authorization: Bearer t" localhost:4747/api/projects` returns 200. If Docker isn't available, say so in your report.
 - `pnpm typecheck` passes
+
+## Clarifications (checked against the code)
+- **pnpm in the image:** don't use `corepack enable`. Corepack is no longer bundled with Node 25+, and the repo has no `packageManager` field. Use `RUN npm install -g pnpm@11.25.0` (the version this repo's lockfile was made with).
+- **Layout:** `WORKDIR /app`. `COPY --chown=node:node` everywhere. Switch to `USER node` before `pnpm install` so `node_modules` is owned by `node`; the `/app` directory must be created and chowned first, as root.
+- **Manifests:** copy `apps/server/package.json`, `apps/web/package.json` and `packages/shared/package.json` explicitly, each to its own path. A glob `COPY` flattens directories. `apps/web/package.json` is needed for the workspace and frozen lockfile to resolve, even though no web sources are copied.
+- **Persistence:** without `DATABASE_URL`, hosted mode uses PGlite under `AWB_HOME`. Set `ENV AWB_HOME=/data`, create `/data` owned by `node` (as root, before `USER node`) and declare `VOLUME /data`. The README must say: mount a volume at `/data` (`-v awb-data:/data`) or set `DATABASE_URL` for Postgres; otherwise data is lost with the container.
+- **README `docker run` example:**
+  - Use `-e` for each variable, plus `-v awb-data:/data` and `-p 4747:4747`.
+  - Document every env var: `AWB_HOST`, `AWB_PORT`, `AWB_HOME`, `DATABASE_URL`, `AWB_ALLOWED_ORIGINS`, `AWB_OWNER_PASSWORD_HASH`, `AWB_SESSION_SECRET`, `AWB_API_TOKENS`.
+  - The password hash can be generated either locally (`awb hash-password '<password>'`) or with the image: `docker run --rm awb node apps/server/bin/awb.js hash-password '<password>'`.
+  - Note that the hash contains `$` characters, so quote it in single quotes or use an `--env-file`.
+  - Note that cookies are `Secure` in hosted mode, so browsers need HTTPS in front.
+- **Hosting section placement:** insert `## 11. Hosting` before the current "11. Notes" and renumber Notes to 12. Add the hosted MCP variants in the Hosting section; don't change the existing local snippets in section 6. The Cursor JSON uses `{ "mcpServers": { "ai-work-board": { "url": "https://api.board.example.com/mcp?actor=cursor", "headers": { "Authorization": "Bearer <token>" } } } }`.
+- **Notes section:** it currently says "no auth; loopback only". Reword that sentence so it's true for both modes: local mode has no auth; hosted mode requires the owner password or an API token. Keep the rest of the Notes section.
+- **Hosting caveat:** add a short "Security" bullet saying there is no built-in login rate limiting yet, so put the API behind a proxy/WAF with rate limits and use a long random owner password.
+- You can't run Docker (shell is limited). Claude will run the Docker checks. Run only `pnpm typecheck`.

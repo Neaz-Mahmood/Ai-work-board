@@ -161,6 +161,103 @@ Commands:
 - `pnpm typecheck`: Run TypeScript type checking (`tsc --noEmit`).
 - `pnpm test:e2e`: Run Playwright end-to-end tests.
 
-## 11. Notes
-Deletion is UI-only and is a guardrail, not security (no auth; loopback only). Agents have no delete operations in MCP or CLI, preventing an automated process from deleting tickets, features, or projects.
+## 11. Hosting
+The AI Work Board can be deployed in hosted mode with a containerized backend and a statically hosted web SPA.
+- **Local mode**: Unchanged; no configuration needed (runs on loopback with embedded PGlite, no auth).
+- **Data migration**: Data from older SQLite-based versions of the board isn't migrated.
+
+### Backend
+The backend runs as a containerized Node.js service. Run **one instance only** (clustering is not supported).
+
+#### 1. Build the Image
+```bash
+docker build -t awb .
+```
+
+#### 2. Generate Owner Password Hash
+The owner password hash can be generated either locally (`awb hash-password '<password>'`) or with the image:
+```bash
+docker run --rm awb node apps/server/bin/awb.js hash-password '<password>'
+```
+> [!NOTE]
+> The hash contains `$` characters, so quote it in single quotes or use an `--env-file`.
+
+#### 3. Run the Container
+```bash
+docker run -d \
+  --name awb \
+  -p 4747:4747 \
+  -v awb-data:/data \
+  -e AWB_HOST=0.0.0.0 \
+  -e AWB_PORT=4747 \
+  -e AWB_HOME=/data \
+  -e DATABASE_URL=postgres://user:password@postgres:5432/awb \
+  -e AWB_ALLOWED_ORIGINS=https://board.example.com \
+  -e AWB_OWNER_PASSWORD_HASH='scrypt$...' \
+  -e AWB_SESSION_SECRET=your-random-session-secret \
+  -e AWB_API_TOKENS=token1,token2 \
+  awb
+```
+
+#### Environment Variables
+- `AWB_HOST`: Host interface to bind (use `0.0.0.0` in Docker; default: `127.0.0.1`).
+- `AWB_PORT`: Port to listen on (default: `4747`).
+- `AWB_HOME`: Base directory for storage and database files (default: `~/.ai-work-board`; `/data` in Docker image).
+- `DATABASE_URL`: PostgreSQL connection string (optional; if unset, embedded PGlite is used under `AWB_HOME`).
+- `AWB_ALLOWED_ORIGINS`: Comma-separated list of allowed browser origins for CORS (e.g. `https://board.example.com`).
+- `AWB_OWNER_PASSWORD_HASH`: Scrypt hash of the owner password for web UI authentication.
+- `AWB_SESSION_SECRET`: Secret key used to sign web UI session cookies.
+- `AWB_API_TOKENS`: Comma-separated list of bearer tokens accepted for API and MCP access.
+
+#### Persistence
+Mount a volume at `/data` (`-v awb-data:/data`) or set `DATABASE_URL` for Postgres; otherwise data is lost with the container. Without `DATABASE_URL`, hosted mode uses PGlite under `AWB_HOME`.
+
+#### HTTPS & Reverse Proxy
+HTTPS must be provided by your host or reverse proxy. Note that cookies are `Secure` in hosted mode, so browsers need HTTPS in front to log in.
+
+#### Security
+- There is no built-in login rate limiting yet, so put the API behind a proxy/WAF with rate limits and use a long random owner password.
+
+### Frontend
+Build the SPA by specifying the backend URL:
+```bash
+VITE_API_URL=https://api.board.example.com pnpm build
+```
+Then upload `apps/web/dist` to any static host.
+- The frontend must be on the same parent domain as the API (e.g. `https://board.example.com` and `https://api.board.example.com`).
+- Its origin must be listed in `AWB_ALLOWED_ORIGINS`.
+
+### Agents
+Configure agents to authenticate with the hosted backend using an API token configured in `AWB_API_TOKENS`:
+
+#### CLI
+Set `AWB_URL` and `AWB_TOKEN` for the CLI:
+```bash
+export AWB_URL=https://api.board.example.com
+export AWB_TOKEN=<token>
+```
+
+#### Claude Code
+```bash
+claude mcp add --transport http awb "https://api.board.example.com/mcp?actor=claude" --header "Authorization: Bearer <token>"
+```
+
+#### Cursor
+Add to your user settings (`~/.cursor/mcp.json`) or repository settings (`<repo>/.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "ai-work-board": {
+      "url": "https://api.board.example.com/mcp?actor=cursor",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      }
+    }
+  }
+}
+```
+
+## 12. Notes
+Deletion is UI-only and is a guardrail, not security (local mode has no auth; hosted mode requires the owner password or an API token). Agents have no delete operations in MCP or CLI, preventing an automated process from deleting tickets, features, or projects.
 # Ai-work-board
+

@@ -16,7 +16,7 @@ Tasks 04–06 keep the approved batches, but each batch's contents are ordered c
 - [10] Expand: extract the shared package — blocked by: 07 — status: done ✅ (agy; no fix rounds; Claude did the workspace wiring + pnpm install + tsconfig include up front, deleted the old src/shared files, and fixed the Done-when grep that matched @awb/shared)
 - [11] Split into web and server apps; local mode serves the bundled SPA — blocked by: 09, 10 — status: done ✅ (agy for config/path edits; Claude did the git mv moves, workspace + package.json wiring and pnpm install, and fixed the README path in apps/server/test/mcp-descriptions.test.ts)
 - [12] Frontend on its own origin: API URL, CORS, login screen — blocked by: 11 — status: done ✅ (agy; no fix rounds; Claude added Clarifications (CORS before auth, session gate, 401 loop guard, hosted e2e API context) and simplified useLogout to avoid QueryCache.add internals)
-- [13] Docker image and hosting docs — blocked by: 12 — status: pending
+- [13] Docker image and hosting docs — blocked by: 12 — status: done ✅ (agy; no fix rounds; Claude added Clarifications (no corepack on Node 26, /data volume, explicit manifest copies), fixed two README errors, and ran docker build + hosted container smoke incl. volume persistence)
 - [14] Rich text editor for Ticket descriptions — blocked by: 11 — status: pending
 - [15] Feature descriptions use the rich text editor — blocked by: 14 — status: pending
 - [16] Prefactor: pure drag-and-drop destination function — blocked by: 11 — status: pending
