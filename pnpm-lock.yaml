@@ -7,9 +7,60 @@ settings:
 overrides:
   ai-work-board: 'link:'
 
+packageExtensionsChecksum: sha256-HDLjba7kDybWqUzxJBJSIC9qzMZrbxea40w+LsA0S7E=
+
 importers:
 
   .:
+    dependencies:
+      ai-work-board:
+        specifier: 'link:'
+        version: 'link:'
+    devDependencies:
+      '@awb/shared':
+        specifier: workspace:*
+        version: link:packages/shared
+      '@hono/node-server':
+        specifier: ^2.1.5
+        version: 2.1.5(hono@4.13.13)
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.64.1
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.6.5
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5))
+
+  apps/server:
+    dependencies:
+      '@awb/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@electric-sql/pglite':
+        specifier: ^0.5.10
+        version: 0.5.10
+      '@hono/node-server':
+        specifier: ^2.1.5
+        version: 2.1.5(hono@4.13.13)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.32.1
+        version: 1.32.1(zod@3.25.76)
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
+  apps/web:
     dependencies:
       '@atlaskit/pragmatic-drag-and-drop':
         specifier: ^3.1.0
@@ -22,16 +73,7 @@ importers:
         version: 2.2.2
       '@awb/shared':
         specifier: workspace:*
-        version: link:packages/shared
-      '@electric-sql/pglite':
-        specifier: ^0.5.10
-        version: 0.5.10
-      '@hono/node-server':
-        specifier: ^2.1.5
-        version: 2.1.5(hono@4.13.13)
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.32.1
-        version: 1.32.1(zod@3.25.76)
+        version: link:../../packages/shared
       '@tanstack/react-query':
         specifier: ^5.104.3
         version: 5.104.3(react@19.3.1)
@@ -65,15 +107,6 @@ importers:
       '@tiptap/starter-kit':
         specifier: 3.32.0
         version: 3.32.0
-      ai-work-board:
-        specifier: 'link:'
-        version: 'link:'
-      hono:
-        specifier: ^4.13.13
-        version: 4.13.13
-      postgres:
-        specifier: ^3.4.9
-        version: 3.4.9
       react:
         specifier: ^19.2.0
         version: 19.3.1
@@ -91,17 +124,8 @@ importers:
         version: 4.0.1
       tiptap-markdown:
         specifier: ^0.9.0
-        version: 0.9.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))
-      zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        version: 0.9.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)
     devDependencies:
-      '@playwright/test':
-        specifier: ^1.64.1
-        version: 1.64.1
-      '@types/node':
-        specifier: ^26.0.0
-        version: 26.6.5
       '@types/react':
         specifier: ^19.2.0
         version: 19.3.0
@@ -111,27 +135,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.1.2
         version: 6.1.2(vite@8.3.4(@types/node@26.6.5))
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
       vite:
         specifier: ^8.3.4
         version: 8.3.4(@types/node@26.6.5)
-      vitest:
-        specifier: ^5.0.5
-        version: 5.0.5(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5))
-
-  apps/server:
-    dependencies:
-      '@awb/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-
-  apps/web:
-    dependencies:
-      '@awb/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
 
   packages/shared: {}
 
@@ -1563,6 +1569,7 @@ packages:
     resolution: {integrity: sha512-dKLQ9iiuGNgrlGVjrNauF/UBzWu4LYOx5pkD0jNkmQt/GOwfCJsBuzZTsf1jZ204ANHOm572mZ9PYvGh1S7tpQ==}
     peerDependencies:
       '@tiptap/core': ^3.0.1
+      '@tiptap/pm': ^3.0.1
 
   toidentifier@1.0.1:
     resolution: {integrity: sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==}
@@ -3336,9 +3343,10 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
-  tiptap-markdown@0.9.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0)):
+  tiptap-markdown@0.9.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0):
     dependencies:
       '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
+      '@tiptap/pm': 3.32.0
       '@types/markdown-it': 13.0.9
       markdown-it: 14.3.3
       markdown-it-task-lists: 2.1.1

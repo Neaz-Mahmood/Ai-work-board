@@ -18,43 +18,14 @@
     "test:e2e": "pnpm build && VITE_API_URL=http://localhost:4801 pnpm --filter @awb/web exec vite build --outDir ../dist-hosted && playwright test"
   },
   "dependencies": {
-    "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
-    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "3.2.0",
-    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.2.2",
-    "@awb/shared": "workspace:*",
-    "@electric-sql/pglite": "^0.5.10",
-    "@hono/node-server": "^2.1.5",
-    "@modelcontextprotocol/sdk": "^1.32.1",
-    "@tanstack/react-query": "^5.104.3",
-    "@tiptap/core": "3.32.0",
-    "@tiptap/extension-table": "3.32.0",
-    "@tiptap/extension-table-cell": "3.32.0",
-    "@tiptap/extension-table-header": "3.32.0",
-    "@tiptap/extension-table-row": "3.32.0",
-    "@tiptap/extension-task-item": "3.32.0",
-    "@tiptap/extension-task-list": "3.32.0",
-    "@tiptap/pm": "3.32.0",
-    "@tiptap/react": "3.32.0",
-    "@tiptap/starter-kit": "3.32.0",
-    "ai-work-board": "link:",
-    "hono": "^4.13.13",
-    "postgres": "^3.4.9",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.18.4",
-    "remark-gfm": "^4.0.1",
-    "tiptap-markdown": "^0.9.0",
-    "zod": "^3.25.76"
+    "ai-work-board": "link:"
   },
   "devDependencies": {
+    "@awb/shared": "workspace:*",
+    "@hono/node-server": "^2.1.5",
     "@playwright/test": "^1.64.1",
     "@types/node": "^26.0.0",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^6.1.2",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4",
     "vitest": "^5.0.5"
   }
 }

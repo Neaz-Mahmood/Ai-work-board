@@ -3,3 +3,8 @@ packages:
   - "packages/*"
 overrides:
   ai-work-board: 'link:'
+packageExtensions:
+  # tiptap-markdown imports @tiptap/pm but only declares @tiptap/core as a peer.
+  tiptap-markdown@0.9.0:
+    peerDependencies:
+      '@tiptap/pm': ^3.0.1
