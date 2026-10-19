@@ -154,6 +154,7 @@ Commands:
 - `awb feature update ID [--name] [-d] [--color]`: Update a feature's name, description, or color.
 
 ## 10. Development
+- `apps/web` (Vite SPA, built to `apps/web/dist`), `apps/server` (domain, REST/SSE/MCP server, `awb` CLI, tests) and `packages/shared` (`@awb/shared` types).
 - `pnpm dev`: Start Vite development server with proxy to backend.
 - `awb start`: Start backend server.
 - `pnpm test`: Run backend unit and integration test suites with Vitest.

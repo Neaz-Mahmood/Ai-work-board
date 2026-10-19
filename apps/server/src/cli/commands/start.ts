@@ -35,7 +35,7 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
 
   const staticDir =
     config.mode === "local"
-      ? fileURLToPath(new URL("../../../dist/web", import.meta.url))
+      ? fileURLToPath(new URL("../../../../web/dist", import.meta.url))
       : undefined;
 
   const appInstance = await createApp({

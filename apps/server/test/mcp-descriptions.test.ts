@@ -121,7 +121,7 @@ describe("MCP tool descriptions and documentation consistency", () => {
   });
 
   test("README.md mentions every tool name and every CLI command", () => {
-    const readmePath = path.resolve(__dirname, "../README.md");
+    const readmePath = path.resolve(__dirname, "../../../README.md");
     expect(fs.existsSync(readmePath), "README.md must exist at repo root").toBe(true);
 
     const readmeContent = fs.readFileSync(readmePath, "utf-8");

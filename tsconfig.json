@@ -14,13 +14,10 @@
     "skipLibCheck": true
   },
   "include": [
-    "src",
+    "apps",
     "packages",
-    "test",
     "e2e",
     "scripts",
-    "bin",
-    "vite.config.ts",
     "vitest.config.ts",
     "playwright.config.ts"
   ]

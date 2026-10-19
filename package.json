@@ -7,14 +7,14 @@
     "node": ">=26"
   },
   "bin": {
-    "awb": "bin/awb.js"
+    "awb": "apps/server/bin/awb.js"
   },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "vite build",
-    "dev": "vite",
-    "start": "node bin/awb.js start",
+    "build": "pnpm --filter @awb/web build",
+    "dev": "pnpm --filter @awb/web dev",
+    "start": "node apps/server/bin/awb.js start",
     "test:e2e": "pnpm build && playwright test"
   },
   "dependencies": {
