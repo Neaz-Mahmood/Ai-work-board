@@ -1,0 +1,910 @@
+import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
+import type { Actor, ColumnId, Priority } from "@awb/shared/types.ts";
+import { COLUMNS } from "@awb/shared/columns.ts";
+import { Modal } from "../Modal.tsx";
+import { PriorityIcon } from "../PriorityIcon.tsx";
+import { ActorAvatar } from "../ActorAvatar.tsx";
+import { Markdown } from "../Markdown.tsx";
+import { MarkdownEditor } from "../editor/MarkdownEditor.tsx";
+import {
+  useTicket,
+  useUpdateTicket,
+  useDeleteTicket,
+  useMoveTicket,
+  useAddComment,
+  useAddBlocker,
+  useRemoveBlocker,
+  useSetNeedsAttention,
+  useClearNeedsAttention,
+} from "../../api/tickets.ts";
+import { ActivityItem, formatRelativeTime } from "./activityText.ts";
+import { useFeatures } from "../../api/features.ts";
+import { FeatureLabel } from "../FeatureLabel.tsx";
+import "./TicketModal.css";
+
+const COLUMN_NAMES: Record<string, string> = {
+  backlog: "Backlog",
+  todo: "To Do",
+  in_progress: "In Progress",
+  in_review: "In Review",
+  done: "Done",
+};
+
+for (const col of COLUMNS) {
+  COLUMN_NAMES[col.id] = col.name;
+}
+
+export type TicketModalProps = {
+  ticketKey?: string | null;
+  isOpen: boolean;
+  onClose: () => void;
+  actors?: Actor[];
+  projectKey?: string;
+  onSelectTicket?: (ticketKey: string) => void;
+};
+
+export function TicketModal({
+  ticketKey,
+  isOpen,
+  onClose,
+  actors = [],
+  projectKey: propProjectKey,
+  onSelectTicket,
+}: TicketModalProps) {
+  const { data: ticket, isLoading, error } = useTicket(ticketKey);
+  const updateTicket = useUpdateTicket();
+  const deleteTicket = useDeleteTicket();
+  const addBlocker = useAddBlocker();
+  const removeBlocker = useRemoveBlocker();
+  const setNeedsAttention = useSetNeedsAttention();
+  const clearNeedsAttention = useClearNeedsAttention();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [blockerDraft, setBlockerDraft] = useState("");
+  const [isFlagFormOpen, setIsFlagFormOpen] = useState(false);
+  const [attentionDraft, setAttentionDraft] = useState("");
+
+  const resolvedProjectKey = ticket?.projectKey ?? propProjectKey ?? "";
+  const moveTicket = useMoveTicket(resolvedProjectKey);
+  const { data: features } = useFeatures(resolvedProjectKey);
+
+  // Menu state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // In-place title edit
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const cancellingTitleRef = useRef(false);
+
+  // Description edit
+  const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState("");
+  const [descDirty, setDescDirty] = useState(false);
+
+  // Assignee draft
+  const [assigneeDraft, setAssigneeDraft] = useState("");
+
+  // Comments and Activity tabs & composer state
+  const [activeTab, setActiveTab] = useState<"comments" | "activity">("comments");
+  const [commentDraft, setCommentDraft] = useState("");
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
+  const addComment = useAddComment(ticket?.key ?? "");
+
+  useEffect(() => {
+    setActiveTab("comments");
+    setCommentDraft("");
+    setIsComposerFocused(false);
+    setBlockerDraft("");
+    setIsFlagFormOpen(false);
+    setAttentionDraft("");
+    setIsEditingDesc(false);
+    setDescDirty(false);
+  }, [ticketKey]);
+
+  const handleResolveAttention = () => {
+    if (!ticket || clearNeedsAttention.isPending) return;
+    clearNeedsAttention.mutate(ticket.key);
+  };
+
+  const handleSetAttention = () => {
+    const trimmed = attentionDraft.trim();
+    if (!trimmed || !ticket || setNeedsAttention.isPending) return;
+    setNeedsAttention.mutate(
+      { ticketKey: ticket.key, reason: trimmed },
+      {
+        onSuccess: () => {
+          setIsFlagFormOpen(false);
+          setAttentionDraft("");
+        },
+      }
+    );
+  };
+
+  const handleOpenTicket = (key: string) => {
+    if (onSelectTicket) {
+      onSelectTicket(key);
+    } else {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("selectedIssue", key);
+        return next;
+      });
+    }
+  };
+
+  const handleAddBlocker = () => {
+    const trimmed = blockerDraft.trim();
+    if (!trimmed || !ticket || addBlocker.isPending) return;
+    addBlocker.mutate(
+      { ticketKey: ticket.key, blockerKey: trimmed },
+      {
+        onSuccess: () => {
+          setBlockerDraft("");
+        },
+      }
+    );
+  };
+
+  const handleRemoveBlocker = (bKey: string) => {
+    if (!ticket || removeBlocker.isPending) return;
+    removeBlocker.mutate({ ticketKey: ticket.key, blockerKey: bKey });
+  };
+
+  useEffect(() => {
+    if (ticket) {
+      setTitleDraft(ticket.title);
+      if (!isEditingDesc) {
+        setDescDraft(ticket.description ?? "");
+      }
+      setAssigneeDraft(ticket.assignee ?? "");
+    }
+  }, [ticket?.title, ticket?.description, ticket?.assignee, isEditingDesc]);
+
+  // Click outside menu listener
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} maxWidth="960px" ariaLabel="Loading ticket">
+        <div className="ticket-modal-loading">Loading {ticketKey}...</div>
+      </Modal>
+    );
+  }
+
+  if (error || !ticket) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} maxWidth="960px" ariaLabel="Ticket not found">
+        <div className="ticket-modal-header">
+          <span className="ticket-modal-key">{ticketKey}</span>
+          <button
+            type="button"
+            className="modal-close-button"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="ticket-modal-error">
+          {error instanceof Error ? error.message : `Ticket ${ticketKey} not found`}
+        </div>
+      </Modal>
+    );
+  }
+
+  const handleSaveTitle = () => {
+    if (cancellingTitleRef.current) {
+      cancellingTitleRef.current = false;
+      return;
+    }
+    setIsEditingTitle(false);
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== ticket.title) {
+      updateTicket.mutate({
+        ticketKey: ticket.key,
+        patch: { title: trimmed },
+      });
+    } else {
+      setTitleDraft(ticket.title);
+    }
+  };
+
+  const handleCancelTitle = () => {
+    cancellingTitleRef.current = true;
+    setTitleDraft(ticket.title);
+    setIsEditingTitle(false);
+  };
+
+  const handleStartEditDesc = () => {
+    setDescDraft(ticket.description ?? "");
+    setDescDirty(false);
+    setIsEditingDesc(true);
+  };
+
+  const handleSaveDesc = () => {
+    setIsEditingDesc(false);
+    if (descDirty && descDraft !== (ticket.description ?? "")) {
+      updateTicket.mutate({
+        ticketKey: ticket.key,
+        patch: { description: descDraft },
+      });
+    }
+    setDescDirty(false);
+  };
+
+  const handleCancelDesc = () => {
+    setDescDraft(ticket.description ?? "");
+    setDescDirty(false);
+    setIsEditingDesc(false);
+  };
+
+  const handleSaveAssignee = () => {
+    const trimmed = assigneeDraft.trim();
+    const current = ticket.assignee ?? "";
+    if (trimmed !== current) {
+      updateTicket.mutate({
+        ticketKey: ticket.key,
+        patch: { assignee: trimmed.length > 0 ? trimmed : null },
+      });
+    }
+  };
+
+  const handleSaveComment = () => {
+    const trimmed = commentDraft.trim();
+    if (!trimmed || addComment.isPending || !ticket) return;
+    addComment.mutate(trimmed, {
+      onSuccess: () => {
+        setCommentDraft("");
+        setIsComposerFocused(false);
+      },
+    });
+  };
+
+  const handleCancelComment = () => {
+    setCommentDraft("");
+    setIsComposerFocused(false);
+  };
+
+  const handleConfirmDelete = () => {
+    deleteTicket.mutate(ticket.key, {
+      onSuccess: () => {
+        setIsConfirmDeleteOpen(false);
+        onClose();
+      },
+    });
+  };
+
+  return (
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        maxWidth="960px"
+        ariaLabel={`Ticket details for ${ticket.key}`}
+      >
+        <div className="ticket-modal">
+          {/* Header */}
+          <div className="ticket-modal-header">
+            <span className="ticket-modal-key">{ticket.key}</span>
+            <div className="ticket-modal-header-actions">
+              <div ref={menuRef}>
+                <button
+                  type="button"
+                  className="ticket-modal-menu-trigger"
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  aria-label="More actions"
+                  aria-haspopup="true"
+                  aria-expanded={isMenuOpen}
+                >
+                  ⋯
+                </button>
+                {isMenuOpen && (
+                  <div className="ticket-modal-menu-dropdown" role="menu">
+                    <button
+                      type="button"
+                      className="ticket-modal-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        setIsConfirmDeleteOpen(true);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="modal-close-button"
+                onClick={onClose}
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Two-column Body */}
+          <div className="ticket-modal-body">
+            {/* Left Column */}
+            <div className="ticket-modal-main">
+              {ticket.needsAttention && (
+                <div className="ticket-modal-attention-banner">
+                  <div className="ticket-modal-attention-text">
+                    Needs attention: {ticket.needsAttention}
+                  </div>
+                  <button
+                    type="button"
+                    className="ticket-modal-attention-resolve-btn"
+                    onClick={handleResolveAttention}
+                    disabled={clearNeedsAttention.isPending}
+                  >
+                    Resolve
+                  </button>
+                </div>
+              )}
+
+              {/* In-place Editable Title */}
+              <div className="ticket-modal-title-wrapper">
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    className="ticket-modal-title-input"
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleSaveTitle();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleCancelTitle();
+                      }
+                    }}
+                    onBlur={handleSaveTitle}
+                    autoFocus
+                  />
+                ) : (
+                  <div
+                    className="ticket-modal-title-display"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setTitleDraft(ticket.title);
+                      setIsEditingTitle(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setTitleDraft(ticket.title);
+                        setIsEditingTitle(true);
+                      }
+                    }}
+                    title="Click to edit title"
+                  >
+                    <h1 className="ticket-modal-title-text">{ticket.title}</h1>
+                  </div>
+                )}
+              </div>
+
+              {/* Description Section */}
+              <div className="ticket-modal-section">
+                <div className="ticket-modal-section-header">
+                  <h3 className="ticket-modal-section-title">Description</h3>
+                  {!isEditingDesc && (
+                    <button
+                      type="button"
+                      className="button-subtle description-edit-btn"
+                      onClick={handleStartEditDesc}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+                {isEditingDesc ? (
+                  <div>
+                    <MarkdownEditor
+                      initialMarkdown={descDraft}
+                      onChange={(markdown) => {
+                        setDescDraft(markdown);
+                        setDescDirty(true);
+                      }}
+                      onSave={handleSaveDesc}
+                      onCancel={handleCancelDesc}
+                      autoFocus
+                      placeholder="Add a description..."
+                      ariaLabel="Description"
+                    />
+                    <div className="description-actions">
+                      <button
+                        type="button"
+                        className="button-primary"
+                        onClick={handleSaveDesc}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={handleCancelDesc}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : ticket.description ? (
+                  <div
+                    className="description-rendered"
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("a")) {
+                        return;
+                      }
+                      handleStartEditDesc();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleStartEditDesc();
+                      }
+                    }}
+                  >
+                    <Markdown>{ticket.description}</Markdown>
+                  </div>
+                ) : (
+                  <div
+                    className="description-placeholder"
+                    role="button"
+                    tabIndex={0}
+                    onClick={handleStartEditDesc}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleStartEditDesc();
+                      }
+                    }}
+                  >
+                    Add a description...
+                  </div>
+                )}
+              </div>
+
+              {/* Tabs Section */}
+              <div className="ticket-modal-section">
+                <div className="ticket-modal-tabs" role="tablist">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "comments"}
+                    className={`ticket-tab-button ${activeTab === "comments" ? "active" : ""}`}
+                    onClick={() => setActiveTab("comments")}
+                  >
+                    Comments
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "activity"}
+                    className={`ticket-tab-button ${activeTab === "activity" ? "active" : ""}`}
+                    onClick={() => setActiveTab("activity")}
+                  >
+                    Activity
+                  </button>
+                </div>
+
+                {activeTab === "comments" && (
+                  <div className="comments-tab-content">
+                    <div className="comment-composer">
+                      <textarea
+                        className={`comment-composer-textarea ${isComposerFocused || commentDraft.length > 0 ? "expanded" : ""}`}
+                        placeholder="Add a comment…"
+                        value={commentDraft}
+                        rows={isComposerFocused || commentDraft.length > 0 ? 4 : 1}
+                        onFocus={() => setIsComposerFocused(true)}
+                        onChange={(e) => setCommentDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                            e.preventDefault();
+                            handleSaveComment();
+                          }
+                        }}
+                      />
+                      {(isComposerFocused || commentDraft.length > 0) && (
+                        <div className="comment-composer-actions">
+                          <button
+                            type="button"
+                            className="button-primary"
+                            disabled={addComment.isPending || !commentDraft.trim()}
+                            onClick={handleSaveComment}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="button-secondary"
+                            disabled={addComment.isPending}
+                            onClick={handleCancelComment}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="comments-list">
+                      {ticket.comments && ticket.comments.length > 0 ? (
+                        [...ticket.comments].reverse().map((comment) => (
+                          <div key={comment.id} className="comment-item">
+                            <ActorAvatar name={comment.actor} actors={actors} />
+                            <div className="comment-item-content">
+                              <div className="comment-item-header">
+                                <span className="comment-actor-name">{comment.actor}</span>
+                                <span className="comment-time" title={comment.createdAt}>
+                                  {formatRelativeTime(comment.createdAt)}
+                                </span>
+                              </div>
+                              <div className="comment-item-body">
+                                <Markdown>{comment.body}</Markdown>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="comments-empty">No comments yet</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "activity" && (
+                  <div className="activity-list">
+                    {ticket.activity && ticket.activity.length > 0 ? (
+                      ticket.activity.map((entry) => (
+                        <ActivityItem
+                          key={entry.id}
+                          entry={entry}
+                          actors={actors}
+                        />
+                      ))
+                    ) : (
+                      <div className="activity-empty">No activity yet</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Side Panel: Details */}
+            <div className="ticket-modal-details">
+              <h3 className="details-panel-title">Details</h3>
+
+              {/* Column Select */}
+              <div className="details-field">
+                <label htmlFor="ticket-column-select" className="details-label">
+                  Column
+                </label>
+                <select
+                  id="ticket-column-select"
+                  value={ticket.column}
+                  onChange={(e) => {
+                    const newColumn = e.target.value as ColumnId;
+                    if (newColumn !== ticket.column) {
+                      moveTicket.mutate({
+                        ticketKey: ticket.key,
+                        column: newColumn,
+                      });
+                    }
+                  }}
+                >
+                  {COLUMNS.map((col) => (
+                    <option key={col.id} value={col.id}>
+                      {col.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Assignee Input */}
+              <div className="details-field">
+                <label htmlFor="ticket-assignee-input" className="details-label">
+                  Assignee
+                </label>
+                <div className="assignee-input-container">
+                  {assigneeDraft.trim() && (
+                    <ActorAvatar name={assigneeDraft.trim()} actors={actors} />
+                  )}
+                  <input
+                    id="ticket-assignee-input"
+                    type="text"
+                    list="assignee-suggestions"
+                    value={assigneeDraft}
+                    placeholder="Unassigned"
+                    onChange={(e) => setAssigneeDraft(e.target.value)}
+                    onBlur={handleSaveAssignee}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                  />
+                  <datalist id="assignee-suggestions">
+                    {actors.map((a) => (
+                      <option key={a.name} value={a.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Priority Select */}
+              <div className="details-field">
+                <label htmlFor="ticket-priority-select" className="details-label">
+                  Priority
+                </label>
+                <div className="priority-select-container">
+                  <PriorityIcon priority={ticket.priority} />
+                  <select
+                    id="ticket-priority-select"
+                    value={ticket.priority}
+                    onChange={(e) => {
+                      const newPriority = e.target.value as Priority;
+                      if (newPriority !== ticket.priority) {
+                        updateTicket.mutate({
+                          ticketKey: ticket.key,
+                          patch: { priority: newPriority },
+                        });
+                      }
+                    }}
+                  >
+                    <option value="highest">Highest</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                    <option value="lowest">Lowest</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Feature Select */}
+              <div className="details-field">
+                <label htmlFor="ticket-feature-select" className="details-label">
+                  Feature
+                </label>
+                <div className="feature-select-container">
+                  {ticket.feature && (
+                    <FeatureLabel feature={ticket.feature} />
+                  )}
+                  <select
+                    id="ticket-feature-select"
+                    value={ticket.feature?.id ? String(ticket.feature.id) : ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const featureId = val === "" ? null : parseInt(val, 10);
+                      updateTicket.mutate({
+                        ticketKey: ticket.key,
+                        projectKey: resolvedProjectKey,
+                        patch: { featureId },
+                      });
+                    }}
+                  >
+                    <option value="">None</option>
+                    {ticket.feature && !features?.some((f) => f.id === ticket.feature?.id) && (
+                      <option value={String(ticket.feature.id)}>
+                        {ticket.feature.name}
+                      </option>
+                    )}
+                    {features?.map((f) => (
+                      <option key={f.id} value={String(f.id)}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Needs Attention Section */}
+              <div className="details-field">
+                <span className="details-label">Attention</span>
+                {isFlagFormOpen ? (
+                  <form
+                    className="attention-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSetAttention();
+                    }}
+                  >
+                    <textarea
+                      className="attention-form-textarea"
+                      placeholder="Why does this need attention?"
+                      value={attentionDraft}
+                      onChange={(e) => setAttentionDraft(e.target.value)}
+                      maxLength={500}
+                      rows={3}
+                      autoFocus
+                    />
+                    <div className="attention-form-actions">
+                      <button
+                        type="submit"
+                        className="button-primary"
+                        disabled={!attentionDraft.trim() || setNeedsAttention.isPending}
+                      >
+                        Flag
+                      </button>
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => {
+                          setIsFlagFormOpen(false);
+                          setAttentionDraft("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    className="button-secondary flag-attention-button"
+                    onClick={() => {
+                      setAttentionDraft(ticket.needsAttention ?? "");
+                      setIsFlagFormOpen(true);
+                    }}
+                  >
+                    Flag as needs attention
+                  </button>
+                )}
+              </div>
+
+              {/* Blocked by Section */}
+              <div className="details-field">
+                <span className="details-label">Blocked by</span>
+                <div className="blockers-list">
+                  {ticket.blockers && ticket.blockers.length > 0 ? (
+                    ticket.blockers.map((b) => (
+                      <div key={b.key} className="blocker-item">
+                        <button
+                          type="button"
+                          className="blocker-link-button"
+                          onClick={() => handleOpenTicket(b.key)}
+                          title={`Open ${b.key}`}
+                        >
+                          <span className="blocker-key">{b.key}</span>
+                          <span className="blocker-title">{b.title}</span>
+                          <span className="lozenge lozenge-column">
+                            {COLUMN_NAMES[b.column] ?? b.column}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="blocker-remove-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveBlocker(b.key);
+                          }}
+                          aria-label={`Remove blocker ${b.key}`}
+                          title="Remove blocker"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="blockers-empty">None</div>
+                  )}
+                </div>
+                <form
+                  className="add-blocker-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleAddBlocker();
+                  }}
+                >
+                  <input
+                    type="text"
+                    className="add-blocker-input"
+                    placeholder="Add blocker (e.g. AWB-2)"
+                    value={blockerDraft}
+                    onChange={(e) => setBlockerDraft(e.target.value)}
+                  />
+                </form>
+              </div>
+
+              {/* Blocks Section */}
+              <div className="details-field">
+                <span className="details-label">Blocks</span>
+                <div className="blocks-list">
+                  {ticket.blocks && ticket.blocks.length > 0 ? (
+                    ticket.blocks.map((b) => (
+                      <div key={b.key} className="blocker-item">
+                        <button
+                          type="button"
+                          className="blocker-link-button"
+                          onClick={() => handleOpenTicket(b.key)}
+                          title={`Open ${b.key}`}
+                        >
+                          <span className="blocker-key">{b.key}</span>
+                          <span className="blocker-title">{b.title}</span>
+                          <span className="lozenge lozenge-column">
+                            {COLUMN_NAMES[b.column] ?? b.column}
+                          </span>
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="blockers-empty">None</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Created Relative Time */}
+              <div className="details-field">
+                <span className="details-label">Created</span>
+                <span className="details-date" title={ticket.createdAt}>
+                  {formatRelativeTime(ticket.createdAt)}
+                </span>
+              </div>
+
+              {/* Updated Relative Time */}
+              <div className="details-field">
+                <span className="details-label">Updated</span>
+                <span className="details-date" title={ticket.updatedAt}>
+                  {formatRelativeTime(ticket.updatedAt)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmation Dialog for Delete */}
+      <Modal
+        isOpen={isConfirmDeleteOpen}
+        onClose={() => setIsConfirmDeleteOpen(false)}
+        title={`Delete ${ticket.key}?`}
+      >
+        <div className="delete-dialog-content">
+          <p className="delete-dialog-message">
+            Delete {ticket.key}? This can't be undone.
+          </p>
+          <div className="delete-dialog-actions">
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => setIsConfirmDeleteOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="button-danger"
+              onClick={handleConfirmDelete}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}

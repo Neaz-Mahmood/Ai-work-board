@@ -1,13 +1,13 @@
 # AI Work Board
 
-A local, Jira-style kanban board where AI coding agents (and the human who drives them) record and track the work they plan and carry out across local codebases.
+A Jira-style kanban board, run on the user's own machine or hosted on a server, where AI coding agents (and the human who drives them) record and track the work they plan and carry out across their local codebases.
 
 ## Language
 
 ### Structure
 
 **Project**:
-One local code repository tracked on the board, identified by its absolute path and a unique Project Key of 2–5 characters (uppercase letters, optionally ending in digits). Each Project has exactly one Board.
+One code repository tracked on the board, identified by its absolute path on the agent's machine and a unique Project Key of 2–5 characters (uppercase letters, optionally ending in digits). Each Project has exactly one Board.
 _Avoid_: Workspace, repo (as a board term), space
 
 **Board**:

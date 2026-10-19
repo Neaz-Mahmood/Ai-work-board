@@ -1,0 +1,149 @@
+.markdown-editor-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: #FFFFFF;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+}
+
+.markdown-editor-container:focus-within {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 1px var(--color-brand);
+}
+
+/* Toolbar styling */
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+}
+
+.editor-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.editor-toolbar-separator {
+  width: 1px;
+  height: 18px;
+  background-color: var(--color-border);
+  margin: 0 4px;
+}
+
+.editor-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 2px 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.editor-toolbar-btn:hover {
+  background-color: var(--color-hover);
+}
+
+.editor-toolbar-btn.is-active,
+.editor-toolbar-btn[aria-pressed="true"] {
+  background-color: var(--color-brand-subtle);
+  color: var(--color-brand);
+  border-color: rgba(12, 102, 228, 0.25);
+}
+
+/* Editor body & editable content */
+.markdown-editor-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-editor-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-editor-content {
+  min-height: 140px;
+  padding: 8px 10px;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--color-text);
+  cursor: text;
+  flex: 1;
+}
+
+/* Placeholder */
+.markdown-editor-placeholder {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  color: var(--color-text-subtle);
+  pointer-events: none;
+  user-select: none;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+
+/* Task items layout */
+.markdown-editor-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.markdown-editor-content li[data-type="taskItem"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.markdown-editor-content li[data-type="taskItem"] > label {
+  flex: 0 0 auto;
+  user-select: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-top: 3px;
+}
+
+.markdown-editor-content li[data-type="taskItem"] > label input[type="checkbox"] {
+  cursor: pointer;
+  margin: 0;
+}
+
+.markdown-editor-content li[data-type="taskItem"] > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.markdown-editor-content li[data-type="taskItem"] > div > p {
+  margin: 0;
+}
+
+.markdown-editor-content ul[data-type="taskList"] ul[data-type="taskList"] {
+  margin-left: 20px;
+}

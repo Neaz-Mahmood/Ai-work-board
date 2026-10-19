@@ -1,4 +1,5 @@
-allowBuilds:
-  better-sqlite3: true
+packages:
+  - "apps/*"
+  - "packages/*"
 overrides:
   ai-work-board: 'link:'

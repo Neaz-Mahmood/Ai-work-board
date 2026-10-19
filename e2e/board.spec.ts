@@ -121,7 +121,7 @@ test.describe("Board E2E Smoke Suite", () => {
     await expect(card3).toBeVisible();
 
     // Drag the third above the first
-    await dragCard(page, card3, card1);
+    await dragCard(page, card3, card1, { edge: "top" });
 
     // Verify order in column is now t3, t1, t2
     const cardsAfterMove = todoCol.locator("[data-ticket-key]");

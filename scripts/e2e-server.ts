@@ -3,13 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
-import { createApp } from "../src/server/app.ts";
+import { createApp } from "../apps/server/src/server/app.ts";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const staticDir = path.join(repoRoot, "dist/web");
+const staticDir = path.join(repoRoot, "apps/web/dist");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "awb-e2e-"));
 
-const appInstance = createApp({ dataDir, staticDir });
+const appInstance = await createApp({ dataDir, staticDir });
 
 const server = serve({
   fetch: appInstance.app.fetch,
@@ -18,7 +18,7 @@ const server = serve({
 });
 
 let cleanedUp = false;
-function cleanup() {
+async function cleanup() {
   if (cleanedUp) return;
   cleanedUp = true;
   try {
@@ -27,7 +27,7 @@ function cleanup() {
     // Ignore error closing server
   }
   try {
-    appInstance.close();
+    await appInstance.close();
   } catch {
     // Ignore error closing app
   }
@@ -38,18 +38,18 @@ function cleanup() {
   }
 }
 
-process.on("SIGINT", () => {
-  cleanup();
+process.on("SIGINT", async () => {
+  await cleanup();
   process.exit(0);
 });
 
-process.on("SIGTERM", () => {
-  cleanup();
+process.on("SIGTERM", async () => {
+  await cleanup();
   process.exit(0);
 });
 
 process.on("exit", () => {
-  cleanup();
+  void cleanup();
 });
 
 server.on("listening", () => {

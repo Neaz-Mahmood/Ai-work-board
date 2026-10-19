@@ -1,0 +1,12 @@
+{
+  "name": "@awb/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "awb": "bin/awb.js"
+  },
+  "dependencies": {
+    "@awb/shared": "workspace:*"
+  }
+}
