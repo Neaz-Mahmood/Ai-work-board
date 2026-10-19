@@ -44,6 +44,7 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
     staticDir,
     auth: config.auth,
     allowedOrigins: config.allowedOrigins,
+    trustProxy: config.trustProxy,
   });
 
   const server = serve({

@@ -13,6 +13,7 @@ describe("resolveServerConfig", () => {
     expect(config.databaseUrl).toBeUndefined();
     expect(config.allowedOrigins).toEqual([]);
     expect(config.auth).toBeUndefined();
+    expect(config.trustProxy).toBe(false);
   });
 
   test("flags beat env", () => {
@@ -178,5 +179,38 @@ describe("resolveServerConfig", () => {
     expect(stderr).toBe(
       "Hosted mode requires: AWB_OWNER_PASSWORD_HASH, AWB_SESSION_SECRET, AWB_API_TOKENS\n"
     );
+  });
+
+  describe("AWB_TRUST_PROXY", () => {
+    test("unset or empty -> false", () => {
+      expect(resolveServerConfig({}).trustProxy).toBe(false);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "" }).trustProxy).toBe(false);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "   " }).trustProxy).toBe(false);
+    });
+
+    test("1, true, yes (case-insensitive, trimmed) -> true", () => {
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "1" }).trustProxy).toBe(true);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "true" }).trustProxy).toBe(true);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "TRUE" }).trustProxy).toBe(true);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "  True  " }).trustProxy).toBe(true);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "yes" }).trustProxy).toBe(true);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "YES" }).trustProxy).toBe(true);
+      expect(resolveServerConfig({ AWB_TRUST_PROXY: "  yes  " }).trustProxy).toBe(true);
+    });
+
+    test("any other value throws ConfigError", () => {
+      expect(() => resolveServerConfig({ AWB_TRUST_PROXY: "maybe" })).toThrowError(
+        new ConfigError("Invalid AWB_TRUST_PROXY: maybe")
+      );
+      expect(() => resolveServerConfig({ AWB_TRUST_PROXY: "false" })).toThrowError(
+        new ConfigError("Invalid AWB_TRUST_PROXY: false")
+      );
+      expect(() => resolveServerConfig({ AWB_TRUST_PROXY: "0" })).toThrowError(
+        new ConfigError("Invalid AWB_TRUST_PROXY: 0")
+      );
+      expect(() => resolveServerConfig({ AWB_TRUST_PROXY: "no" })).toThrowError(
+        new ConfigError("Invalid AWB_TRUST_PROXY: no")
+      );
+    });
   });
 });

@@ -35,6 +35,7 @@ export type AppOptions = {
     secureCookies: boolean;
   };
   allowedOrigins?: string[];
+  trustProxy?: boolean;
 };
 
 export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx; close(): Promise<void> }> {
@@ -136,7 +137,7 @@ export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx
     return c.json({ ok: true, version });
   });
 
-  app.route("/api/auth", createAuthRoute(ctx, opts.auth));
+  app.route("/api/auth", createAuthRoute(ctx, opts.auth, { trustProxy: opts.trustProxy }));
   app.route("/api/events", createEventsRoute(ctx, opts.sseHeartbeatMs));
   app.route("/api/projects", createProjectsRoute(ctx));
   app.route("/", createFeaturesRoute(ctx));

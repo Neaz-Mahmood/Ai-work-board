@@ -208,6 +208,7 @@ docker run -d \
 - `AWB_OWNER_PASSWORD_HASH`: Scrypt hash of the owner password for web UI authentication.
 - `AWB_SESSION_SECRET`: Secret key used to sign web UI session cookies.
 - `AWB_API_TOKENS`: Comma-separated list of bearer tokens accepted for API and MCP access.
+- `AWB_TRUST_PROXY`: Set to `true` when a reverse proxy sets `X-Forwarded-For`; login rate limiting then uses the client address it reports.
 
 #### Persistence
 Mount a volume at `/data` (`-v awb-data:/data`) or set `DATABASE_URL` for Postgres; otherwise data is lost with the container. Without `DATABASE_URL`, hosted mode uses PGlite under `AWB_HOME`.
@@ -216,7 +217,7 @@ Mount a volume at `/data` (`-v awb-data:/data`) or set `DATABASE_URL` for Postgr
 HTTPS must be provided by your host or reverse proxy. Note that cookies are `Secure` in hosted mode, so browsers need HTTPS in front to log in.
 
 #### Security
-- There is no built-in login rate limiting yet, so put the API behind a proxy/WAF with rate limits and use a long random owner password.
+- Failed sign-ins are limited to 5 per client IP per 15 minutes; set `AWB_TRUST_PROXY=true` behind a proxy, or all clients share the proxy's address; still use a long random owner password and long random API tokens.
 
 ### Frontend
 Build the SPA by specifying the backend URL:

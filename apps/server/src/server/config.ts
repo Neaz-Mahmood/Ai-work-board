@@ -15,6 +15,7 @@ export type ServerConfig = {
   dataDir: string;
   databaseUrl?: string;
   allowedOrigins: string[];
+  trustProxy: boolean;
   auth?: {
     ownerPasswordHash: string;
     sessionSecret: string;
@@ -102,12 +103,24 @@ export function resolveServerConfig(
     };
   }
 
+  const rawTrustProxy = clean(env.AWB_TRUST_PROXY);
+  let trustProxy = false;
+  if (rawTrustProxy !== undefined) {
+    const lower = rawTrustProxy.toLowerCase();
+    if (lower === "1" || lower === "true" || lower === "yes") {
+      trustProxy = true;
+    } else {
+      throw new ConfigError(`Invalid AWB_TRUST_PROXY: ${rawTrustProxy}`);
+    }
+  }
+
   const config: ServerConfig = {
     mode,
     host,
     port,
     dataDir,
     allowedOrigins,
+    trustProxy,
   };
 
   if (databaseUrl !== undefined) {
