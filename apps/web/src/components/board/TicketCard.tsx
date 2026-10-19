@@ -1,10 +1,18 @@
-import React from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import React, { useRef, useState, useEffect, useCallback } from "react";
+import {
+  draggable,
+  dropTargetForElements,
+} from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
+import {
+  attachClosestEdge,
+  extractClosestEdge,
+} from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import type { Card, Actor } from "@awb/shared/types.ts";
 import { PriorityIcon } from "../PriorityIcon.tsx";
 import { ActorAvatar } from "../ActorAvatar.tsx";
 import { FeatureLabel } from "../FeatureLabel.tsx";
+import { setCardDragPreview } from "./setCardDragPreview.ts";
 
 export type TicketCardProps = {
   card: Card;
@@ -34,7 +42,7 @@ export function TicketCard({
       ref={ref}
       role="button"
       tabIndex={0}
-      className={`ticket-card ${isOverlay ? "is-overlay" : ""} ${className}`.trim()}
+      className={`ticket-card ${className}`.trim()}
       data-ticket-key={card.key}
       style={style}
       onClick={onClick}
@@ -89,54 +97,93 @@ export function TicketCard({
   );
 }
 
-export type SortableTicketCardProps = TicketCardProps;
+const setEdgeAttribute = (element: HTMLElement, edge: string | null) => {
+  if (element.getAttribute("data-drop-edge") === edge) return;
+  if (edge === null) element.removeAttribute("data-drop-edge");
+  else element.setAttribute("data-drop-edge", edge);
+};
 
-export function SortableTicketCard({
-  card,
-  actors,
-  onClick,
-}: SortableTicketCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: card.key,
-    data: {
-      type: "card",
-      card,
-      columnId: card.column,
-    },
-  });
+export type DraggableTicketCardProps = {
+  card: Card;
+  actors?: Actor[];
+  onTicketClick?: (ticketKey: string) => void;
+};
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+export const DraggableTicketCard = React.memo(
+  function DraggableTicketCard({
+    card,
+    actors,
+    onTicketClick,
+  }: DraggableTicketCardProps) {
+    const ref = useRef<HTMLDivElement>(null);
+    const didDragRef = useRef(false);
+    const [isDragging, setIsDragging] = useState(false);
 
-  if (isDragging) {
+    useEffect(() => {
+      const element = ref.current;
+      if (!element) return undefined;
+
+      const cleanup = combine(
+        draggable({
+          element,
+          getInitialData: () => ({
+            type: "card" as const,
+            cardKey: card.key,
+            columnId: card.column,
+          }),
+          onGenerateDragPreview: setCardDragPreview,
+          onDragStart: () => {
+            didDragRef.current = true;
+            setIsDragging(true);
+          },
+          onDrop: () => {
+            setIsDragging(false);
+            window.setTimeout(() => {
+              didDragRef.current = false;
+            }, 0);
+          },
+        }),
+        dropTargetForElements({
+          element,
+          canDrop: ({ source }) =>
+            source.data.type === "card" && source.data.cardKey !== card.key,
+          getIsSticky: () => true,
+          getData: ({ input, element: dropElement }) =>
+            attachClosestEdge(
+              { type: "card", cardKey: card.key, columnId: card.column },
+              { input, element: dropElement, allowedEdges: ["top", "bottom"] }
+            ),
+          onDrag: ({ self }) => {
+            const edge = extractClosestEdge(self.data);
+            setEdgeAttribute(
+              element,
+              edge === "top" || edge === "bottom" ? edge : null
+            );
+          },
+          onDragLeave: () => setEdgeAttribute(element, null),
+          onDrop: () => setEdgeAttribute(element, null),
+        })
+      );
+
+      return () => {
+        setEdgeAttribute(element, null);
+        cleanup();
+      };
+    }, [card.key, card.column]);
+
+    const handleClick = useCallback(() => {
+      if (didDragRef.current) return;
+      onTicketClick?.(card.key);
+    }, [card.key, onTicketClick]);
+
     return (
-      <div
-        ref={setNodeRef}
-        className="ticket-card ticket-card-placeholder"
-        data-ticket-key={card.key}
-        aria-hidden="true"
+      <TicketCard
+        ref={ref}
+        card={card}
+        actors={actors}
+        onClick={handleClick}
+        style={{ opacity: isDragging ? 0.4 : undefined }}
       />
     );
   }
-
-  return (
-    <TicketCard
-      ref={setNodeRef}
-      style={style}
-      card={card}
-      actors={actors}
-      onClick={onClick}
-      {...attributes}
-      {...listeners}
-    />
-  );
-}
+);

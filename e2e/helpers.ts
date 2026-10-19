@@ -140,22 +140,25 @@ export async function getTicket(
   return res.json();
 }
 
-export async function dragCard(page: Page, source: Locator, target: Locator) {
-  const sourceBox = await source.boundingBox();
+export async function dragCard(
+  _page: Page,
+  source: Locator,
+  target: Locator,
+  opts?: { edge?: "top" | "bottom" }
+) {
   const targetBox = await target.boundingBox();
-  if (!sourceBox || !targetBox) {
+  if (!targetBox) {
     throw new Error("Could not find bounding box for drag");
   }
 
-  const startX = sourceBox.x + sourceBox.width / 2;
-  const startY = sourceBox.y + sourceBox.height / 2;
-  const endX = targetBox.x + targetBox.width / 2;
-  const endY = targetBox.y + targetBox.height / 2;
+  let targetPosition: { x: number; y: number };
+  if (opts?.edge === "top") {
+    targetPosition = { x: targetBox.width / 2, y: 4 };
+  } else if (opts?.edge === "bottom") {
+    targetPosition = { x: targetBox.width / 2, y: targetBox.height - 4 };
+  } else {
+    targetPosition = { x: targetBox.width / 2, y: targetBox.height / 2 };
+  }
 
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  // Move 10px with steps to respect the 5px activation distance
-  await page.mouse.move(startX + 10, startY + 10, { steps: 5 });
-  await page.mouse.move(endX, endY, { steps: 20 });
-  await page.mouse.up();
+  await source.dragTo(target, { targetPosition });
 }

@@ -1,25 +1,11 @@
-import React, { useState, useEffect } from "react";
-import {
-  DndContext,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-  pointerWithin,
-  closestCorners,
-  type CollisionDetection,
-  type DragStartEvent,
-  type DragOverEvent,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import type { Board as BoardType, Card, ColumnId } from "@awb/shared/types.ts";
 import { useMoveTicket, subscribeToast } from "../../api/tickets.ts";
 import type { BoardFilters } from "../../api/board.ts";
 import { Column } from "./Column.tsx";
-import { TicketCard } from "./TicketCard.tsx";
-import { getDropDestination } from "./boardDnd.ts";
+import { getDropDestination, type DropTarget } from "./boardDnd.ts";
 import "./board.css";
 
 export type BoardProps = {
@@ -30,21 +16,20 @@ export type BoardProps = {
 };
 
 export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps) {
-  const [activeTicket, setActiveTicket] = useState<Card | null>(null);
-  const [overColumnId, setOverColumnId] = useState<ColumnId | null>(null);
   const [toastError, setToastError] = useState<string | null>(null);
 
-  const pointerSensor = useSensor(PointerSensor, {
-    activationConstraint: {
-      distance: 5,
-    },
-  });
-  const keyboardSensor = useSensor(KeyboardSensor, {
-    coordinateGetter: sortableKeyboardCoordinates,
-  });
-  const sensors = useSensors(pointerSensor, keyboardSensor);
-
   const moveTicket = useMoveTicket(board.project.key, filters);
+
+  const boardRef = useRef(board);
+  boardRef.current = board;
+  const moveTicketRef = useRef(moveTicket);
+  moveTicketRef.current = moveTicket;
+  const onTicketClickRef = useRef(onTicketClick);
+  onTicketClickRef.current = onTicketClick;
+
+  const handleTicketClick = useCallback((ticketKey: string) => {
+    onTicketClickRef.current?.(ticketKey);
+  }, []);
 
   useEffect(() => {
     return subscribeToast((msg) => {
@@ -59,123 +44,62 @@ export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps)
     }
   }, [toastError]);
 
-  const collisionDetection: CollisionDetection = (args) => {
-    const pointerCollisions = pointerWithin(args);
-    if (pointerCollisions.length > 0) {
-      return pointerCollisions;
-    }
-    return closestCorners(args);
-  };
+  useEffect(() => {
+    return monitorForElements({
+      canMonitor: ({ source }) => source.data.type === "card",
+      onDrop: ({ source, location }) => {
+        const innermost = location.current.dropTargets[0];
+        if (!innermost) return;
 
-  function findTicket(ticketKey: string): Card | null {
-    for (const col of board.columns) {
-      const card = col.tickets.find((t) => t.key === ticketKey);
-      if (card) return card;
-    }
-    return null;
-  }
+        const cardKey = source.data.cardKey;
+        if (typeof cardKey !== "string") return;
 
-  function findColumnIdForId(id: string): ColumnId | null {
-    if (board.columns.some((c) => c.id === id)) {
-      return id as ColumnId;
-    }
-    const col = board.columns.find((c) =>
-      c.tickets.some((t) => t.key === id)
-    );
-    return col ? col.id : null;
-  }
+        let activeCard: Card | undefined;
+        for (const col of boardRef.current.columns) {
+          activeCard = col.tickets.find((t) => t.key === cardKey);
+          if (activeCard) break;
+        }
+        if (!activeCard) return;
 
-  function handleDragStart(event: DragStartEvent) {
-    const { active } = event;
-    const card = findTicket(String(active.id));
-    if (card) {
-      setActiveTicket(card);
-      setOverColumnId(card.column);
-    }
-  }
+        let target: DropTarget | null = null;
+        if (
+          innermost.data.type === "card" &&
+          typeof innermost.data.cardKey === "string"
+        ) {
+          const rawEdge = extractClosestEdge(innermost.data);
+          target = {
+            kind: "card",
+            cardKey: innermost.data.cardKey,
+            edge: rawEdge === "top" || rawEdge === "bottom" ? rawEdge : "bottom",
+          };
+        } else if (
+          innermost.data.type === "column" &&
+          typeof innermost.data.columnId === "string"
+        ) {
+          target = {
+            kind: "column",
+            columnId: innermost.data.columnId as ColumnId,
+          };
+        }
 
-  function handleDragOver(event: DragOverEvent) {
-    const { over } = event;
-    if (!over) {
-      setOverColumnId(null);
-      return;
-    }
-    const colId = findColumnIdForId(String(over.id));
-    setOverColumnId(colId);
-  }
+        if (!target) return;
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    setActiveTicket(null);
-    setOverColumnId(null);
-
-    if (!over) {
-      return;
-    }
-
-    const activeKey = String(active.id);
-    const activeCard = findTicket(activeKey);
-    if (!activeCard) {
-      return;
-    }
-
-    const sourceColId = activeCard.column;
-    const sourceCol = board.columns.find((c) => c.id === sourceColId);
-    if (!sourceCol) {
-      return;
-    }
-
-    const activeIndex = sourceCol.tickets.findIndex((t) => t.key === activeKey);
-    const overId = String(over.id);
-
-    // Case 1: Dropped onto a column directly (e.g. empty column or column body)
-    const targetColAsCol = board.columns.find((c) => c.id === overId);
-    if (targetColAsCol) {
-      const dest = getDropDestination({
-        activeCard,
-        columns: board.columns,
-        target: { kind: "column", columnId: targetColAsCol.id },
-      });
-      if (dest) {
-        moveTicket.mutate({
-          ticketKey: activeKey,
-          column: dest.column,
-          position: dest.position,
+        const dest = getDropDestination({
+          activeCard,
+          columns: boardRef.current.columns,
+          target,
         });
-      }
-      return;
-    }
 
-    // Case 2: Dropped onto another ticket card
-    const targetColWithCard = board.columns.find((c) =>
-      c.tickets.some((t) => t.key === overId)
-    );
-    if (targetColWithCard) {
-      const isSameCol = sourceColId === targetColWithCard.id;
-      const overIndex = targetColWithCard.tickets.findIndex(
-        (t) => t.key === overId
-      );
-      const edge = isSameCol && activeIndex < overIndex ? "bottom" : "top";
-      const dest = getDropDestination({
-        activeCard,
-        columns: board.columns,
-        target: { kind: "card", cardKey: overId, edge },
-      });
-      if (dest) {
-        moveTicket.mutate({
-          ticketKey: activeKey,
-          column: dest.column,
-          position: dest.position,
-        });
-      }
-      return;
-    }
-  }
-
-  function handleDragCancel() {
-    setActiveTicket(null);
-    setOverColumnId(null);
-  }
+        if (dest) {
+          moveTicketRef.current.mutate({
+            ticketKey: activeCard.key,
+            column: dest.column,
+            position: dest.position,
+          });
+        }
+      },
+    });
+  }, []);
 
   const totalCards = board.columns.reduce(
     (sum, col) => sum + col.tickets.length,
@@ -184,42 +108,23 @@ export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps)
   const showEmptyFilteredMessage = Boolean(isFiltered && totalCards === 0);
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={collisionDetection}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      <div className="board-area">
-        {showEmptyFilteredMessage && (
-          <div className="board-empty-filters-message" role="status">
-            No tickets match these filters
-          </div>
-        )}
-        <div className="board-columns">
-          {board.columns.map((column) => (
-            <Column
-              key={column.id}
-              column={column}
-              actors={board.actors}
-              projectKey={board.project.key}
-              isHighlighted={overColumnId === column.id}
-              onTicketClick={onTicketClick}
-            />
-          ))}
+    <div className="board-area">
+      {showEmptyFilteredMessage && (
+        <div className="board-empty-filters-message" role="status">
+          No tickets match these filters
         </div>
-      </div>
-      <DragOverlay>
-        {activeTicket ? (
-          <TicketCard
-            card={activeTicket}
+      )}
+      <div className="board-columns">
+        {board.columns.map((column) => (
+          <Column
+            key={column.id}
+            column={column}
             actors={board.actors}
-            isOverlay
+            projectKey={board.project.key}
+            onTicketClick={handleTicketClick}
           />
-        ) : null}
-      </DragOverlay>
+        ))}
+      </div>
       {toastError && (
         <div className="board-toast-error" role="alert">
           <span>{toastError}</span>
@@ -233,6 +138,6 @@ export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps)
           </button>
         </div>
       )}
-    </DndContext>
+    </div>
   );
 }

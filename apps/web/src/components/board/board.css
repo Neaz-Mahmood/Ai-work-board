@@ -88,6 +88,7 @@
 }
 
 .ticket-card {
+  position: relative;
   background-color: #FFFFFF;
   box-shadow: 0 1px 1px rgba(9, 30, 66, 0.25);
   border-radius: var(--radius-sm, 3px);
@@ -106,20 +107,27 @@
   background-color: #F7F8F9;
 }
 
-.ticket-card.ticket-card-placeholder {
-  background-color: rgba(9, 30, 66, 0.04);
-  border: 1px dashed var(--color-border, #091E4224);
-  box-shadow: none;
-  min-height: 64px;
-  cursor: default;
+.ticket-card[data-drop-edge]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-brand, #0C66E4);
+  border-radius: 1px;
   pointer-events: none;
+  z-index: 2;
 }
 
-.ticket-card.is-overlay {
-  width: 260px;
-  box-sizing: border-box;
-  box-shadow: 0 10px 20px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
-  transform: rotate(2deg);
+.ticket-card[data-drop-edge='top']::after {
+  top: -3px;
+}
+
+.ticket-card[data-drop-edge='bottom']::after {
+  bottom: -3px;
+}
+
+.board-card-overlay {
   cursor: grabbing;
 }
 

@@ -46,11 +46,6 @@ This task ports that approach. A pure function, `getDropDestination` in `apps/we
     - With a search filter active (use the Board search input as in "5. Filters"), dropping relative to a visible card lands at the right full-Column Rank, checked via the API with the filter cleared.
 
 ## Follow these existing patterns
-- `/Users/neazmahmood/Desktop/projects/web/viva-os/viva-os-ui/apps/project-management/src/features/board/board-card.tsx` (around the `draggable(...)` / `dropTargetForElements(...)` effect and `setEdgeAttribute`): card drag source and target with the closest edge set as a DOM attribute.
-- `.../features/board/board-column.tsx` (its `dropTargetForElements` for the Column body): the Column drop target.
-- `.../features/board/use-board-dnd.ts`: a single `monitorForElements` handling the drop through a callbacks ref.
-- `.../features/board/set-board-drag-preview.ts` (`setBoardCardDragPreview`): the native preview clone.
-- `.../features/board/board-auto-scroll.ts` and `board.css`: auto-scroll and drop-indicator styling.
 - `apps/web/src/api/tickets.ts` `useMoveTicket`: keep its optimistic update and rollback as is.
 
 ## Do not
@@ -63,3 +58,48 @@ This task ports that approach. A pure function, `getDropDestination` in `apps/we
 - `pnpm typecheck` passes
 - `pnpm test` passes
 - `pnpm test:e2e` passes
+
+## Clarifications (checked against the code)
+- **Reference code is inside this repo now:** `.cursor/feature-pipeline/remote-backend-rich-text-dnd/reference-17/` holds excerpts from the viva-os board:
+  - `board-card.excerpt.tsx`: card `draggable` + `dropTargetForElements` effect, `setEdgeAttribute`;
+  - `board-column.excerpt.tsx`: Column body drop target + `autoScrollForElements`;
+  - `use-board-dnd.ts`: the single `monitorForElements`;
+  - `set-board-drag-preview.ts`;
+  - `board-auto-scroll.ts`;
+  - `board-drop-indicator.excerpt.css`: insertion-line CSS.
+
+  Read those for patterns, and **never read any path outside this repository** (doing so aborts your run). Mirror only what this task needs: no Column dragging, virtualisation, activation handles, prefetch or drop-flash.
+- **Dependencies are installed by Claude; don't run pnpm add or remove.**
+  - `@atlaskit/pragmatic-drag-and-drop@^3.1.0` (3.1.0);
+  - `@atlaskit/pragmatic-drag-and-drop-hitbox@^2.2.2`;
+  - `@atlaskit/pragmatic-drag-and-drop-auto-scroll@3.2.0`, pinned exactly: 3.2.1 depends on core 4.x, which would create a second drag registry.
+  - `@dnd-kit/*` is already uninstalled, so typecheck fails until you remove its imports from `Board.tsx`, `Column.tsx` and `TicketCard.tsx`.
+- **Import paths** (as in the reference):
+  - `@atlaskit/pragmatic-drag-and-drop/element/adapter` (`draggable`, `dropTargetForElements`, `monitorForElements`);
+  - `@atlaskit/pragmatic-drag-and-drop/combine`;
+  - `@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview` and `.../element/pointer-outside-of-preview`;
+  - `@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge` (`attachClosestEdge`, `extractClosestEdge`);
+  - `@atlaskit/pragmatic-drag-and-drop-auto-scroll/element` (`autoScrollForElements`).
+
+  If a path in the reference differs (e.g. `adapter/element-adapter`), use whichever resolves in typecheck.
+- **Drop-edge attribute:** use `data-drop-edge` (the spec's name), not the reference's `data-card-edge`. Only touch the DOM when the value changes (as `setEdgeAttribute` does).
+- **Column:**
+  - Remove the `isHighlighted` prop. The Board no longer tracks the hovered Column; the Column toggles `is-over` on its own element in the drop target's `onDragEnter`/`onDragLeave`/`onDrop`.
+  - Keep `projectKey`, `actors` and the existing markup/classes.
+  - The Column drop target's `canDrop` accepts only card drags.
+- **Monitor `onDrop` (Board):** `const innermost = location.current.dropTargets[0]`. If none → return.
+  - If `innermost.data.type === "card"` → `{ kind: "card", cardKey, edge: extractClosestEdge(innermost.data) }`. Treat a non-`top`/`bottom` edge as `"bottom"`.
+  - If `type === "column"` → `{ kind: "column", columnId }`.
+  - Find `activeCard` by `source.data.cardKey` in `boardRef.current.columns`.
+  - `canMonitor: ({ source }) => source.data.type === "card"`.
+- **Click vs drag:** use a `didDragRef` like the reference (set in `onDragStart`, cleared with `setTimeout(…, 0)` after drop). `TicketCard`'s `onClick` ignores clicks while it's `true`.
+- **Keyboard:** the dnd-kit keyboard sensor goes away. Task 19 adds keyboard moves, so don't add one now. Keep Enter/Space opening the modal.
+- **Removing props:** remove `TicketCard`'s now-unused `isOverlay`/`style` props only if nothing else uses them.
+- **E2E:**
+  - `dragCard(page, source, target, opts?: { edge?: "top" | "bottom" })`: compute the target's bounding box. `targetPosition` is `{ x: width / 2, y: 4 }` for top, `{ x: width / 2, y: height - 4 }` for bottom, and the centre otherwise. Call `source.dragTo(target, { targetPosition })`.
+  - In `board.spec.ts`:
+    - "3. Reorder within a Column" drags card3 onto card1 and expects card3 first, so call it with `{ edge: "top" }`;
+    - "2. Drag across Columns" drags onto the Column locator (centre) and needs no change, unless the Column locator's centre lands on a card, in which case target the Column's empty area.
+  - Don't add sleeps or `waitForTimeout`. Use `expect(...).toHaveAttribute`/`toBeVisible` polling.
+- **Hosted e2e:** `e2e/hosted/auth.spec.ts` must keep passing.
+- Don't add locks or mutexes.
