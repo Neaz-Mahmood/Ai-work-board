@@ -164,12 +164,16 @@
   border-color: var(--color-brand);
 }
 
-.description-textarea {
-  min-height: 120px;
-  resize: vertical;
-  font-family: inherit;
-  font-size: var(--font-size-base);
-  line-height: 1.5;
+.description-rendered {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  margin: -4px;
+  border: 1px solid transparent;
+}
+
+.description-rendered:hover {
+  background-color: var(--color-hover);
 }
 
 .description-actions {
@@ -466,6 +470,22 @@
 
 .markdown-content th {
   background-color: var(--color-surface);
+}
+
+.markdown-content ul.contains-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.markdown-content li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.markdown-content li.task-list-item input[type="checkbox"] {
+  margin-top: 4px;
 }
 
 /* Blockers & Blocks in side panel */

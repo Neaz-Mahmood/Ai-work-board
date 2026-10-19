@@ -6,6 +6,7 @@ import { Modal } from "../Modal.tsx";
 import { PriorityIcon } from "../PriorityIcon.tsx";
 import { ActorAvatar } from "../ActorAvatar.tsx";
 import { Markdown } from "../Markdown.tsx";
+import { MarkdownEditor } from "../editor/MarkdownEditor.tsx";
 import {
   useTicket,
   useUpdateTicket,
@@ -81,6 +82,7 @@ export function TicketModal({
   // Description edit
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [descDraft, setDescDraft] = useState("");
+  const [descDirty, setDescDirty] = useState(false);
 
   // Assignee draft
   const [assigneeDraft, setAssigneeDraft] = useState("");
@@ -98,6 +100,8 @@ export function TicketModal({
     setBlockerDraft("");
     setIsFlagFormOpen(false);
     setAttentionDraft("");
+    setIsEditingDesc(false);
+    setDescDirty(false);
   }, [ticketKey]);
 
   const handleResolveAttention = () => {
@@ -152,10 +156,12 @@ export function TicketModal({
   useEffect(() => {
     if (ticket) {
       setTitleDraft(ticket.title);
-      setDescDraft(ticket.description ?? "");
+      if (!isEditingDesc) {
+        setDescDraft(ticket.description ?? "");
+      }
       setAssigneeDraft(ticket.assignee ?? "");
     }
-  }, [ticket?.title, ticket?.description, ticket?.assignee]);
+  }, [ticket?.title, ticket?.description, ticket?.assignee, isEditingDesc]);
 
   // Click outside menu listener
   useEffect(() => {
@@ -229,21 +235,24 @@ export function TicketModal({
 
   const handleStartEditDesc = () => {
     setDescDraft(ticket.description ?? "");
+    setDescDirty(false);
     setIsEditingDesc(true);
   };
 
   const handleSaveDesc = () => {
     setIsEditingDesc(false);
-    if (descDraft !== (ticket.description ?? "")) {
+    if (descDirty && descDraft !== (ticket.description ?? "")) {
       updateTicket.mutate({
         ticketKey: ticket.key,
         patch: { description: descDraft },
       });
     }
+    setDescDirty(false);
   };
 
   const handleCancelDesc = () => {
     setDescDraft(ticket.description ?? "");
+    setDescDirty(false);
     setIsEditingDesc(false);
   };
 
@@ -414,12 +423,17 @@ export function TicketModal({
                 </div>
                 {isEditingDesc ? (
                   <div>
-                    <textarea
-                      className="description-textarea"
-                      value={descDraft}
-                      onChange={(e) => setDescDraft(e.target.value)}
-                      rows={6}
+                    <MarkdownEditor
+                      initialMarkdown={descDraft}
+                      onChange={(markdown) => {
+                        setDescDraft(markdown);
+                        setDescDirty(true);
+                      }}
+                      onSave={handleSaveDesc}
+                      onCancel={handleCancelDesc}
                       autoFocus
+                      placeholder="Add a description..."
+                      ariaLabel="Description"
                     />
                     <div className="description-actions">
                       <button
@@ -439,7 +453,25 @@ export function TicketModal({
                     </div>
                   </div>
                 ) : ticket.description ? (
-                  <Markdown>{ticket.description}</Markdown>
+                  <div
+                    className="description-rendered"
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("a")) {
+                        return;
+                      }
+                      handleStartEditDesc();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleStartEditDesc();
+                      }
+                    }}
+                  >
+                    <Markdown>{ticket.description}</Markdown>
+                  </div>
                 ) : (
                   <div
                     className="description-placeholder"

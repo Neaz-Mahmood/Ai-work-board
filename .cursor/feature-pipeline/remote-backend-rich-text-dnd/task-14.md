@@ -58,3 +58,36 @@ The editor is a shared component; the next task reuses it for Feature descriptio
 - `pnpm typecheck` passes
 - `pnpm test` passes
 - `pnpm test:e2e` passes
+
+## Clarifications (checked against the code)
+- **Dependencies are already installed by Claude; don't run pnpm add.**
+  - All `@tiptap/*` packages are pinned to **3.32.0**, not 3.27.1. StarterKit 3.27.1 pulls its sub-extensions at `^3.27.1` → 3.32.0, which mixed two Tiptap versions.
+  - `@tiptap/core@3.32.0` is installed explicitly (peer of `tiptap-markdown`).
+  - `tiptap-markdown@^0.9.0` (resolves to 0.9.0).
+  - Import from the package names as usual: `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-task-list`, etc.
+- **Do not read the viva-os reference files** listed under "Follow these existing patterns": they are outside this repo and reading them aborts your run. The Do list and these Clarifications are sufficient.
+- **Typing `editor.storage.markdown`:** in `MarkdownEditor.tsx`, add a small typed helper rather than `any`:
+  ```ts
+  function getMarkdown(editor: Editor): string {
+    return (editor.storage as unknown as { markdown: { getMarkdown(): string } }).markdown.getMarkdown();
+  }
+  ```
+- **No PATCH without edits (critical, checked by e2e 3):** Tiptap or extensions (e.g. table normalisation) may dispatch doc-changing transactions on load. To be safe:
+  - Ignore every `onUpdate` until `onCreate` has fired.
+  - Then call `onChange` only for transactions that are not `transaction.getMeta("addToHistory") === false`.
+  - TicketModal keeps `descDirty` and also compares strings (as the Do list says).
+  - If e2e 3 still sees a PATCH, find the transaction source; don't weaken the test.
+- **Live updates while editing:** `TicketModal.tsx` line ~155 resets `descDraft` from `ticket.description` in an effect. That's fine: the editor loads `initialMarkdown` once at mount, so a live update must not remount or reset an open editor. Don't key the editor on `ticket.description`. Set `descDirty = false` when editing starts, saves or cancels.
+- **Styling:**
+  - Put the editor/toolbar styles in `apps/web/src/components/editor/MarkdownEditor.css` (imported by `MarkdownEditor.tsx`), not in `TicketModal.css`, so task 15 can reuse them.
+  - Give the editable ProseMirror element the class `markdown-content` (via `editorProps.attributes.class`), so it inherits the existing read-only rules for tables, code blocks and lists, which are defined in `apps/web/src/components/ticket/TicketModal.css`.
+  - In `MarkdownEditor.css`, add only editor-specific rules: border/focus ring/min-height (copy the values from `.description-textarea` in `TicketModal.css`), the placeholder, and task items (`ul[data-type="taskList"]` / `li[data-type="taskItem"]` checkbox layout).
+  - Remove `.description-textarea` from `TicketModal.css` only if nothing else uses it.
+- **Placeholder:** there is no placeholder extension in the dependency list, so don't add one. Implement `placeholder` with CSS on the empty first paragraph: `.is-editor-empty:first-child::before { content: attr(data-placeholder) }`, setting `data-placeholder` through a decoration-free approach. Simplest: render the placeholder as an absolutely positioned `div` in `MarkdownEditor` while `editor.isEmpty`.
+- **Click-to-edit on rendered description:** wrap `<Markdown>` in a `div` with `onClick` that ignores clicks whose target is inside an `a` element (`(e.target as HTMLElement).closest("a")`). Give it `role="button"`, `tabIndex={0}` and Enter-to-edit, matching the placeholder's existing handlers.
+- **E2E:**
+  - `e2e/board.spec.ts` "4. Modal edit and comment" never types into the description, so leave `board.spec.ts` unchanged.
+  - In `e2e/editor.spec.ts`, use `page.keyboard.press("ControlOrMeta+Enter")` for save.
+  - Toolbar buttons are found by `getByRole("button", { name: "<aria-label>" })`. Use these exact aria-labels: "Heading 1", "Heading 2", "Heading 3", "Bold", "Italic", "Strikethrough", "Inline code", "Code block", "Bullet list", "Numbered list", "Task list", "Link", "Blockquote", "Horizontal rule", "Insert table".
+  - For the no-PATCH check, record requests with `method() === "PATCH"` to `/api/tickets/` and assert the count is 0.
+- Don't add locks or mutexes. Don't touch the server, the comment composer or inline ticket creation.
