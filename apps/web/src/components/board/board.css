@@ -141,6 +141,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding-right: 24px;
 }
 
 .ticket-card-markers {
@@ -378,3 +379,97 @@
     opacity: 1;
   }
 }
+
+/* Screen reader announcer */
+.board-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Card actions button and menu */
+.card-actions-root {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+}
+
+.card-actions-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm, 3px);
+  color: var(--color-text-subtle, #626F86);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.ticket-card:hover .card-actions-button,
+.ticket-card:focus .card-actions-button,
+.ticket-card:focus-within .card-actions-button,
+.card-actions-button:focus,
+.card-actions-root.is-open .card-actions-button {
+  opacity: 1;
+}
+
+.card-actions-button:hover,
+.card-actions-root.is-open .card-actions-button {
+  background-color: rgba(9, 30, 66, 0.08);
+  color: var(--color-text, #172B4D);
+}
+
+.card-actions-button:focus-visible {
+  outline: 2px solid var(--color-brand, #0C66E4);
+  outline-offset: 1px;
+}
+
+.card-actions-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  min-width: 160px;
+  background-color: #FFFFFF;
+  border-radius: var(--radius-sm, 3px);
+  box-shadow: 0 4px 8px -2px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+  padding: 4px 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-actions-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text, #172B4D);
+  font-size: var(--font-size-base, 14px);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+
+.card-actions-menu-item:hover,
+.card-actions-menu-item:focus {
+  background-color: var(--color-surface, #F1F2F4);
+  outline: none;
+}
+
