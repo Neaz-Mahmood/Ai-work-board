@@ -1,32 +1,53 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cp from "node:child_process";
 import { serve } from "@hono/node-server";
 import { createApp } from "../../server/app.ts";
-import { defaultDataDir, defaultPort } from "../../server/config.ts";
+import { resolveServerConfig, ConfigError } from "../../server/config.ts";
 import type { CliIo } from "../client.ts";
 
 export type StartOptions = {
+  host?: string;
   port?: string;
   "data-dir"?: string;
   open?: boolean;
 };
 
 export async function startCommand(io: CliIo, values: StartOptions): Promise<number> {
-  const port = values.port ? Number(values.port) : defaultPort(io.env);
-  if (Number.isNaN(port) || port <= 0) {
-    io.stderr(`Invalid port: ${values.port}\n`);
-    return 2;
+  let config;
+  try {
+    config = resolveServerConfig(io.env, {
+      host: values.host,
+      port: values.port,
+      dataDir: values["data-dir"],
+    });
+  } catch (err: unknown) {
+    if (err instanceof ConfigError) {
+      io.stderr(`${err.message}\n`);
+      return 2;
+    }
+    throw err;
   }
 
-  const dataDir = (values["data-dir"] as string | undefined) ?? defaultDataDir(io.env);
-  const staticDir = fileURLToPath(new URL("../../../dist/web", import.meta.url));
+  const database = config.databaseUrl
+    ? { kind: "postgres" as const, url: config.databaseUrl }
+    : { kind: "pglite" as const, dir: path.join(config.dataDir, "pgdata") };
 
-  const appInstance = await createApp({ dataDir, staticDir });
+  const staticDir =
+    config.mode === "local"
+      ? fileURLToPath(new URL("../../../dist/web", import.meta.url))
+      : undefined;
+
+  const appInstance = await createApp({
+    dataDir: config.dataDir,
+    database,
+    staticDir,
+  });
 
   const server = serve({
     fetch: appInstance.app.fetch,
-    port,
-    hostname: "127.0.0.1",
+    port: config.port,
+    hostname: config.host,
   });
 
   return new Promise<number>((resolve) => {
@@ -42,7 +63,7 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
       void appInstance.close();
       const code = (err as { code?: string })?.code;
       if (code === "EADDRINUSE") {
-        io.stderr(`Port ${port} is in use. Use --port or AWB_PORT.\n`);
+        io.stderr(`Port ${config.port} is in use. Use --port or AWB_PORT.\n`);
       } else {
         const message = err instanceof Error ? err.message : String(err);
         io.stderr(`Server error: ${message}\n`);
@@ -51,10 +72,12 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
     });
 
     server.on("listening", () => {
-      io.stdout(`AI Work Board running at http://127.0.0.1:${port}\n`);
-      if (values.open) {
+      const urlHost = config.host.includes(":") ? `[${config.host}]` : config.host;
+      const url = `http://${urlHost}:${config.port}`;
+      io.stdout(`AI Work Board running at ${url}\n`);
+      if (values.open && config.mode === "local") {
         try {
-          cp.spawn("open", [`http://127.0.0.1:${port}`], { detached: true, stdio: "ignore" }).unref();
+          cp.spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
         } catch {
           // ignore failure to launch browser
         }

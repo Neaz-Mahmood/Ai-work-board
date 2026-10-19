@@ -11,7 +11,7 @@ Tasks 04–06 keep the approved batches, but each batch's contents are ordered c
 - [05] Migrate batch B: Tickets, Blockers, Features — blocked by: 04 — status: done ✅ (agy; fix-1 restored the name_lower lookup for Feature names, since SQLite lower() is ASCII-only)
 - [06] Migrate batch C: Projects, Actors, Activity, listing Comments — blocked by: 05 — status: done ✅ (agy; no fixes needed)
 - [07] Contract: switch storage to PGlite and Postgres — blocked by: 06 — status: done ✅ (agy; Claude removed better-sqlite3 + allowBuilds entry, narrowed SqlParam to exclude undefined, ran the start/restart smoke test; Postgres adapter not yet run against a real server)
-- [08] Server config resolver and hosted-mode detection — blocked by: 07 — status: pending
+- [08] Server config resolver and hosted-mode detection — blocked by: 07 — status: done ✅ (agy; no fixes needed; Claude added Clarifications and ran the hosted-refusal and local-start smoke tests)
 - [09] Owner auth and API tokens across API, SSE, MCP and CLI — blocked by: 08 — status: pending
 - [10] Expand: extract the shared package — blocked by: 07 — status: pending
 - [11] Split into web and server apps; local mode serves the bundled SPA — blocked by: 09, 10 — status: pending

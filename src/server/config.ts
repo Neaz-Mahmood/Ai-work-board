@@ -1,19 +1,121 @@
 import os from "node:os";
 import path from "node:path";
 
-export function defaultDataDir(env: Record<string, string | undefined> = process.env): string {
-  if (env.AWB_HOME && env.AWB_HOME.trim() !== "") {
-    return env.AWB_HOME;
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigError";
   }
-  return path.join(os.homedir(), ".ai-work-board");
 }
 
-export function defaultPort(env: Record<string, string | undefined> = process.env): number {
-  if (env.AWB_PORT) {
-    const parsed = Number(env.AWB_PORT);
-    if (!Number.isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
+export type ServerConfig = {
+  mode: "local" | "hosted";
+  host: string;
+  port: number;
+  dataDir: string;
+  databaseUrl?: string;
+  allowedOrigins: string[];
+  auth?: {
+    ownerPasswordHash: string;
+    sessionSecret: string;
+    apiTokens: string[];
+    secureCookies: boolean;
+  };
+};
+
+export type ServerConfigFlags = {
+  host?: string;
+  port?: string;
+  dataDir?: string;
+};
+
+function clean(val: string | undefined): string | undefined {
+  if (val === undefined) return undefined;
+  const trimmed = val.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+function parseCommaList(val: string | undefined): string[] {
+  if (!val) return [];
+  return val
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+export function resolveServerConfig(
+  env: Record<string, string | undefined> = process.env,
+  flags?: ServerConfigFlags
+): ServerConfig {
+  const host = clean(flags?.host) ?? clean(env.AWB_HOST) ?? "127.0.0.1";
+
+  let rawPort: string | undefined = flags?.port;
+  if (rawPort === undefined) {
+    rawPort = clean(env.AWB_PORT);
   }
-  return 4747;
+
+  let port = 4747;
+  if (rawPort !== undefined) {
+    const trimmed = rawPort.trim();
+    if (!/^\d+$/.test(trimmed) || Number(trimmed) < 1 || Number(trimmed) > 65535) {
+      throw new ConfigError(`Invalid port: ${rawPort}`);
+    }
+    port = Number(trimmed);
+  }
+
+  const dataDir =
+    clean(flags?.dataDir) ??
+    clean(env.AWB_HOME) ??
+    path.join(os.homedir(), ".ai-work-board");
+
+  const databaseUrl = clean(env.DATABASE_URL);
+  const allowedOrigins = parseCommaList(env.AWB_ALLOWED_ORIGINS);
+
+  const isLoopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
+  const mode: "local" | "hosted" = (!isLoopback || databaseUrl !== undefined) ? "hosted" : "local";
+
+  let auth: ServerConfig["auth"];
+  if (mode === "hosted") {
+    const missing: string[] = [];
+    const ownerPasswordHash = clean(env.AWB_OWNER_PASSWORD_HASH);
+    if (!ownerPasswordHash) {
+      missing.push("AWB_OWNER_PASSWORD_HASH");
+    }
+    const sessionSecret = clean(env.AWB_SESSION_SECRET);
+    if (!sessionSecret) {
+      missing.push("AWB_SESSION_SECRET");
+    }
+    const apiTokens = parseCommaList(env.AWB_API_TOKENS);
+    if (apiTokens.length === 0) {
+      missing.push("AWB_API_TOKENS");
+    }
+
+    if (missing.length > 0) {
+      throw new ConfigError(`Hosted mode requires: ${missing.join(", ")}`);
+    }
+
+    auth = {
+      ownerPasswordHash: ownerPasswordHash!,
+      sessionSecret: sessionSecret!,
+      apiTokens,
+      secureCookies: !isLoopback,
+    };
+  }
+
+  const config: ServerConfig = {
+    mode,
+    host,
+    port,
+    dataDir,
+    allowedOrigins,
+  };
+
+  if (databaseUrl !== undefined) {
+    config.databaseUrl = databaseUrl;
+  }
+  if (auth !== undefined) {
+    config.auth = auth;
+  }
+
+  return config;
 }

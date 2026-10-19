@@ -56,3 +56,17 @@ Storage is already PGlite/Postgres (`createApp`'s `database` option). This task 
 - `pnpm test` passes
 - `pnpm typecheck` passes
 - `pnpm test:e2e` passes
+
+## Clarifications (checked against the code)
+- Export `class ConfigError extends Error` (set `name = "ConfigError"`) and `resolveServerConfig` from `src/server/config.ts`. Remove `defaultDataDir` / `defaultPort`; their only caller is `start.ts`.
+- Treat an env var that is empty or whitespace-only as unset (current `AWB_HOME` behaviour). Trim values.
+- Port: the value must be an integer in 1–65535. Anything else (`"abc"`, `"0"`, `"70000"`, `"3.5"`) throws `ConfigError` with message `Invalid port: <raw value>`. This applies to both the flag and `AWB_PORT`. Today a bad `AWB_PORT` silently falls back to 4747; that changes to an error.
+- Comma lists (`AWB_ALLOWED_ORIGINS`, `AWB_API_TOKENS`): split on `,`, trim each entry, drop empty ones.
+- Missing-vars error message: `Hosted mode requires: AWB_OWNER_PASSWORD_HASH, AWB_SESSION_SECRET, AWB_API_TOKENS` (list only the missing ones, in that order). `AWB_API_TOKENS` counts as missing when it has no non-empty entry.
+- Loopback check is an exact match on `127.0.0.1`, `localhost`, `::1`.
+- `start.ts`: call `resolveServerConfig(io.env, { host: values.host, port: values.port, dataDir: values["data-dir"] })` inside try/catch. On `ConfigError`, write `<message>\n` to stderr and return 2. Rethrow other errors. Add `host?: string` to `StartOptions`.
+- Pass `database` to `createApp` explicitly (`{ kind: "postgres", url }` or `{ kind: "pglite", dir: path.join(dataDir, "pgdata") }`). Pass `staticDir` only when `mode === "local"`.
+- Build the startup URL as `http://${host}:${port}`, with IPv6 hosts (any host containing `:`) wrapped in brackets. Use the same URL for the `open` call, which still runs only when `values.open` is set and mode is local.
+- `src/cli/main.ts`: add `host: { type: "string" }` next to `port` under "start options". Add `[--host H]` to the `start` line in the top-level USAGE and in the `awb start` help. Add a help line: `--host <H>           Interface to bind (default: 127.0.0.1 or AWB_HOST)`. Then pass `host` through wherever `port` is passed to `startCommand`.
+- `test/config.test.ts`: pass a plain env object (never `process.env`). For the dataDir default, assert that it ends with `.ai-work-board`.
+- Don't add locks or mutexes, and don't change `src/server/app.ts`.

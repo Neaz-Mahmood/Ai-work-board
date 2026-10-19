@@ -29,7 +29,7 @@ export type { CliIo } from "./client.ts";
 const USAGE = `Usage: awb <command> [options]
 
 Commands:
-  start [--port N] [--data-dir DIR] [--open]
+  start [--host H] [--port N] [--data-dir DIR] [--open]
                  Start the AI Work Board server in the foreground
   init [--key KEY] [--name NAME] [--path DIR]
                  Register a directory as a Project
@@ -84,11 +84,12 @@ function getHelpText(cmd?: string, sub?: string): string {
 
   switch (cmd) {
     case "start":
-      return `Usage: awb start [--port N] [--data-dir DIR] [--open]
+      return `Usage: awb start [--host H] [--port N] [--data-dir DIR] [--open]
 
 Start the AI Work Board server in the foreground.
 
 Options:
+  --host <H>           Interface to bind (default: 127.0.0.1 or AWB_HOST)
   --port <N>           Port to listen on (default: 4747 or AWB_PORT)
   --data-dir <DIR>     Directory for board database (default: ~/.ai-work-board or AWB_HOME)
   --open               Open the board in the default browser on start
@@ -401,6 +402,7 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
         help: { type: "boolean", short: "h" },
 
         // start options
+        host: { type: "string" },
         port: { type: "string" },
         "data-dir": { type: "string" },
         open: { type: "boolean" },
@@ -472,6 +474,7 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
     switch (command) {
       case "start":
         return await startCommand(io, {
+          host: parsed.values.host as string | undefined,
           port: parsed.values.port as string | undefined,
           "data-dir": parsed.values["data-dir"] as string | undefined,
           open: parsed.values.open as boolean | undefined,
