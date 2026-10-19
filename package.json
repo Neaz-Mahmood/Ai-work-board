@@ -15,7 +15,7 @@
     "build": "pnpm --filter @awb/web build",
     "dev": "pnpm --filter @awb/web dev",
     "start": "node apps/server/bin/awb.js start",
-    "test:e2e": "pnpm build && playwright test"
+    "test:e2e": "pnpm build && VITE_API_URL=http://localhost:4801 pnpm --filter @awb/web exec vite build --outDir ../dist-hosted && playwright test"
   },
   "dependencies": {
     "@awb/shared": "workspace:*",

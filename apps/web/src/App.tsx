@@ -9,6 +9,8 @@ import {
 } from "react-router-dom";
 import type { Project } from "@awb/shared/types.ts";
 import { useProjects } from "./api/projects.ts";
+import { useSession } from "./api/auth.ts";
+import { LoginPage } from "./pages/LoginPage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { AddProjectDialog } from "./components/AddProjectDialog.tsx";
 import { ProjectSettingsDialog } from "./components/ProjectSettingsDialog.tsx";
@@ -98,7 +100,7 @@ function ProjectRoute({
   return <BoardPage project={project} />;
 }
 
-export function App() {
+function BoardApp() {
   const { data: projects = [], isLoading } = useProjects();
   const location = useLocation();
 
@@ -156,4 +158,18 @@ export function App() {
       />
     </div>
   );
+}
+
+export function App() {
+  const { data: session, isLoading } = useSession();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (session?.authEnabled && !session.signedIn) {
+    return <LoginPage />;
+  }
+
+  return <BoardApp />;
 }

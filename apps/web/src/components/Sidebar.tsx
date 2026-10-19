@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import type { Project } from "@awb/shared/types.ts";
+import { useSession, useLogout } from "../api/auth.ts";
 import "./Sidebar.css";
 
 const PROJECT_PALETTE = [
@@ -56,6 +57,9 @@ export function Sidebar({
   onAddProject,
   onOpenSettings,
 }: SidebarProps) {
+  const { data: session } = useSession();
+  const logout = useLogout();
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -120,6 +124,17 @@ export function Sidebar({
         >
           + Add project
         </button>
+        {session?.authEnabled && (
+          <button
+            type="button"
+            className="sidebar-signout-button"
+            data-testid="sign-out"
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+          >
+            Sign out
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -169,3 +169,24 @@
   border-color: var(--color-text-subtle);
   color: var(--color-text);
 }
+
+.sidebar-signout-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  background-color: transparent;
+  border: none;
+  color: var(--color-text);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-signout-button:hover:not(:disabled) {
+  background-color: var(--color-hover);
+}

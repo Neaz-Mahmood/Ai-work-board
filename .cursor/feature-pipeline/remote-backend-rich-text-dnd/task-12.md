@@ -68,3 +68,34 @@ Local mode (same origin, no auth) must behave exactly as today.
 - `pnpm test` passes
 - `pnpm typecheck` passes
 - `pnpm test:e2e` passes (both the `local` and `hosted` projects)
+
+## Clarifications (checked against the code)
+- **Middleware order in `app.ts` (critical):**
+  - Register the CORS middleware (`app.use("/api/*", corsMw)` and `app.use("/mcp", corsMw)`) **before** the existing auth middleware, and always, not only when `opts.auth` is set. Browser preflight `OPTIONS` requests carry no cookie or token, so they must be answered by CORS before auth runs.
+  - 401 responses from the auth middleware must still carry `Access-Control-Allow-Origin` / `-Credentials` for an allowed origin; otherwise the SPA can't read the 401. Add a test for this.
+  - With `allowedOrigins` empty or undefined, the `origin` function returns `null` for every origin, so no CORS headers are added and local behaviour is unchanged.
+- **CORS tests:** `apps/server/test/cors.test.ts` uses `makeTestApp({ allowedOrigins: [...] })` with `app.request(...)` and explicit `Origin` headers. Add one case with `auth` set: a request from an allowed origin without credentials → 401 **with** the CORS headers, and a preflight from an allowed origin → 204 (not 401). Use `hashPassword` from `apps/server/src/server/auth.ts` for the auth fixture.
+- **Session gate in `App.tsx`:** today `App` calls `useProjects()` at the top level, which would fire before login and 401.
+  - Rename the current `App` function body to `function BoardApp()` in the same file, unchanged.
+  - The exported `App` becomes the gate: `useSession()`; while loading → `null`; if `authEnabled && !signedIn` → `<LoginPage />`; otherwise → `<BoardApp />`.
+  - Don't navigate on login or logout. The URL stays put, so after sign-in the same route renders.
+- **`apps/web/src/api/auth.ts`:**
+  - Add `session: ["session"] as const` to `qk` in `queryKeys.ts`.
+  - `useSession`: `retry: false`, `staleTime: Infinity`.
+  - `useLogin`: mutation `POST /api/auth/login { password }`; on success → `queryClient.invalidateQueries({ queryKey: qk.session })`.
+  - `useLogout`: mutation `POST /api/auth/logout`; on success → `queryClient.clear()`, then `queryClient.invalidateQueries({ queryKey: qk.session })`.
+  - LoginPage shows the server's `ApiFailure.message` ("Wrong password") on a 401.
+- **Global 401 handler (`main.tsx`):** only invalidate the session query when the failing query/mutation is not the session query or the login mutation, so a wrong password doesn't loop. Use `query.queryKey[0] !== "session"` in `QueryCache.onError`, and give the login mutation `meta: { skipAuthInvalidate: true }`, checked in `MutationCache.onError`.
+- **Sidebar sign-out:** `Sidebar.tsx` calls `useSession()` itself (no new props). Render the button in a footer `div` after the projects nav, styled in `Sidebar.css` to match the existing sidebar links.
+- **`vite-env.d.ts`:** keep the existing `/// <reference types="vite/client" />` line, then add `interface ImportMetaEnv { readonly VITE_API_URL?: string }` and `interface ImportMeta { readonly env: ImportMetaEnv }`.
+- **The only raw `fetch` / `EventSource` calls** are in `api/client.ts` and `api/useLiveUpdates.ts` (line 29). Both go through `apiUrl(...)`.
+- **`.gitignore`:** `dist` doesn't match `dist-hosted`. Add a line `dist-hosted`.
+- **`scripts/e2e-hosted-server.ts`:**
+  - Mirror `scripts/e2e-server.ts`: `dataDir` from `mkdtemp`, `database: { kind: "pglite" }` (no dir = in-memory), no `staticDir`.
+  - `serve({ ..., port: 4801, hostname: "localhost" })`.
+  - Import `hashPassword` from `../apps/server/src/server/auth.ts`.
+- **Hosted e2e API calls:** `e2e/helpers.ts` posts to relative URLs, which in the `hosted` project would hit the SPA origin (4800). In `e2e/hosted/auth.spec.ts`, build an API context with `playwright.request.newContext({ baseURL: "http://localhost:4801", extraHTTPHeaders: { Authorization: "Bearer e2e-token", "X-AWB-Actor": "e2e-agent" } })` and pass it to the existing `createProject` / `createTicket` helpers. Dispose it in `afterAll`. Don't change `e2e/helpers.ts`, except to add something if you truly need it.
+- **`playwright.config.ts`:** keep `workers: 1`, `retries: 0` and the `local` project's existing settings. Each project sets its own `use.baseURL`. Each `webServer` entry keeps `reuseExistingServer: false`. The vite preview command runs with `cwd` defaulting to the repo root, which is fine because of `--filter`.
+- **Root `package.json` `test:e2e`:** `pnpm build && VITE_API_URL=http://localhost:4801 pnpm --filter @awb/web exec vite build --outDir ../dist-hosted && playwright test`.
+- **Login form:** use `<form onSubmit>` so Enter submits. Use `type="password"` and `autoFocus`. Disable the button while the mutation is pending.
+- Don't add locks or mutexes. Don't change `auth.ts`, `requestActor.ts` or the auth middleware logic, beyond registering CORS before it.

@@ -12,6 +12,10 @@ export class ApiFailure extends Error {
   }
 }
 
+export function apiUrl(path: string): string {
+  return (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "") + path;
+}
+
 export async function api<T>(
   method: string,
   path: string,
@@ -25,13 +29,14 @@ export async function api<T>(
   const init: RequestInit = {
     method,
     headers,
+    credentials: "include",
   };
 
   if (body !== undefined) {
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(path, init);
+  const res = await fetch(apiUrl(path), init);
 
   if (!res.ok) {
     let code = "UNKNOWN";

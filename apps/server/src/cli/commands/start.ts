@@ -43,6 +43,7 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
     database,
     staticDir,
     auth: config.auth,
+    allowedOrigins: config.allowedOrigins,
   });
 
   const server = serve({

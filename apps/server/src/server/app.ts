@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Hono, type MiddlewareHandler } from "hono";
+import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Clock } from "./clock.ts";
 import { systemClock } from "./clock.ts";
@@ -33,6 +34,7 @@ export type AppOptions = {
     apiTokens: string[];
     secureCookies: boolean;
   };
+  allowedOrigins?: string[];
 };
 
 export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx; close(): Promise<void> }> {
@@ -64,6 +66,25 @@ export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx
     }
     return c.json({ error: { code: "INTERNAL", message: err.message || "Internal server error" } }, 500);
   });
+
+  const allowed = new Set(opts.allowedOrigins ?? []);
+  const rawCors = cors({
+    origin: (origin) => (allowed.has(origin) ? origin : null),
+    credentials: true,
+    allowHeaders: ["Content-Type", "X-AWB-Actor", "Authorization"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  });
+  const corsMw: MiddlewareHandler = async (c, next) => {
+    const origin = c.req.header("origin");
+    if (!origin || !allowed.has(origin)) {
+      return next();
+    }
+    return rawCors(c, next);
+  };
+
+  app.use("/api/*", corsMw);
+  app.use("/mcp", corsMw);
+  app.use("/mcp/*", corsMw);
 
   if (opts.auth) {
     const authConfig = opts.auth;

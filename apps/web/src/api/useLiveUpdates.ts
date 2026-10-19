@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BoardEvent, BoardEventType } from "@awb/shared/events.ts";
+import { apiUrl } from "./client.ts";
 import { qk } from "./queryKeys.ts";
 
 const BOARD_EVENT_TYPES: BoardEventType[] = [
@@ -26,7 +27,10 @@ export function useLiveUpdates(projectKey: string): void {
     }
 
     let hasOpened = false;
-    const es = new EventSource(`/api/events?project=${encodeURIComponent(projectKey)}`);
+    const es = new EventSource(
+      apiUrl(`/api/events?project=${encodeURIComponent(projectKey)}`),
+      { withCredentials: true }
+    );
 
     es.onopen = () => {
       if (hasOpened) {
