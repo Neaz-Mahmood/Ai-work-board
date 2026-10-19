@@ -1,6 +1,6 @@
 import type { CliIo, GlobalOptions } from "../client.ts";
 import { apiRequest } from "../client.ts";
-import type { Project } from "../../shared/types.ts";
+import type { Project } from "@awb/shared/types.ts";
 
 export async function projectsCommand(
   io: CliIo,

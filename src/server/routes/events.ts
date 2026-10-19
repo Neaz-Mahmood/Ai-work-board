@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { Ctx } from "../../domain/context.ts";
-import type { BoardEvent } from "../../domain/events.ts";
+import type { BoardEvent } from "@awb/shared/events.ts";
 
 export function createEventsRoute(ctx: Ctx, sseHeartbeatMs?: number): Hono {
   const router = new Hono();

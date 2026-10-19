@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { Board } from "../../shared/types.ts";
+import type { Board } from "@awb/shared/types.ts";
 import { api } from "./client.ts";
 import { qk } from "./queryKeys.ts";
 

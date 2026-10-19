@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { Feature } from "../../../shared/types.ts";
+import type { Feature } from "@awb/shared/types.ts";
 import {
   useFeatures,
   useCreateFeature,

@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { Ctx } from "./context.ts";
-import type { ColumnId, Project } from "../shared/types.ts";
+import type { ColumnId, Project } from "@awb/shared/types.ts";
 import { DomainError, validation, notFound, conflict } from "../server/errors.ts";
 
 export function normalizeProjectPath(p: string): string {

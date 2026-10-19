@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { APIRequestContext, Page, Locator } from "@playwright/test";
-import type { Project, Ticket, Feature } from "../src/shared/types.ts";
+import type { Project, Ticket, Feature } from "@awb/shared/types.ts";
 
 let projectSequence = 0;
 

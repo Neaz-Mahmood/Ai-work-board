@@ -14,7 +14,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import type { Board as BoardType, Card, ColumnId } from "../../../shared/types.ts";
+import type { Board as BoardType, Card, ColumnId } from "@awb/shared/types.ts";
 import { useMoveTicket, subscribeToast } from "../../api/tickets.ts";
 import type { BoardFilters } from "../../api/board.ts";
 import { Column } from "./Column.tsx";

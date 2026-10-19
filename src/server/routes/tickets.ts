@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Ctx } from "../../domain/context.ts";
-import type { ColumnId, Priority } from "../../shared/types.ts";
+import type { ColumnId, Priority } from "@awb/shared/types.ts";
 import { validation } from "../errors.ts";
 import { listActors } from "../../domain/actors.ts";
 import { requestActor } from "../requestActor.ts";

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { BoardEvent, BoardEventType } from "../../domain/events.ts";
+import type { BoardEvent, BoardEventType } from "@awb/shared/events.ts";
 import { qk } from "./queryKeys.ts";
 
 const BOARD_EVENT_TYPES: BoardEventType[] = [

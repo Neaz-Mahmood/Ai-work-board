@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { Actor, Feature } from "../../../shared/types.ts";
+import type { Actor, Feature } from "@awb/shared/types.ts";
 import { ActorAvatar } from "../ActorAvatar.tsx";
 import { FeatureLabel } from "../FeatureLabel.tsx";
 import "./BoardFilters.css";

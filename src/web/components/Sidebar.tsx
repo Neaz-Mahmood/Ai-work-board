@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import type { Project } from "../../shared/types.ts";
+import type { Project } from "@awb/shared/types.ts";
 import "./Sidebar.css";
 
 const PROJECT_PALETTE = [

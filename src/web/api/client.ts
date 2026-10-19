@@ -1,4 +1,4 @@
-import type { ApiError } from "../../shared/types.ts";
+import type { ApiError } from "@awb/shared/types.ts";
 
 export class ApiFailure extends Error {
   status: number;

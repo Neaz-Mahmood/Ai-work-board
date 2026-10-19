@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import type { ColumnId } from "../../../shared/types.ts";
+import type { ColumnId } from "@awb/shared/types.ts";
 import { useCreateTicket } from "../../api/tickets.ts";
 
 export type CreateTicketInlineProps = {

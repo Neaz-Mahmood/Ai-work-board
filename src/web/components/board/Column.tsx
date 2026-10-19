@@ -4,7 +4,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { Card, ColumnId, Actor } from "../../../shared/types.ts";
+import type { Card, ColumnId, Actor } from "@awb/shared/types.ts";
 import { SortableTicketCard } from "./TicketCard.tsx";
 import { CreateTicketInline } from "./CreateTicketInline.tsx";
 

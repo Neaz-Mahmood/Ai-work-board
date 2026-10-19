@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Feature, Ticket } from "../../shared/types.ts";
+import type { Feature, Ticket } from "@awb/shared/types.ts";
 import { api } from "./client.ts";
 import { qk } from "./queryKeys.ts";
 

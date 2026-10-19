@@ -1,5 +1,5 @@
 import React from "react";
-import type { FeatureRef, Feature } from "../../shared/types.ts";
+import type { FeatureRef, Feature } from "@awb/shared/types.ts";
 import "./features/features.css";
 
 export type FeatureLabelProps = {

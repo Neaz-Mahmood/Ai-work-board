@@ -28,3 +28,27 @@ The AI Work Board (repo root `/Users/neazmahmood/Desktop/projects/practice/ai-wo
 - `pnpm test` passes
 - `pnpm typecheck` passes
 - `pnpm test:e2e` passes
+
+## Clarifications (checked against the code)
+- **Already done by Claude; don't redo or edit these:**
+  - `pnpm-workspace.yaml` (packages + the existing override);
+  - `packages/shared/package.json`;
+  - the root `package.json` dependency `"@awb/shared": "workspace:*"`, plus `pnpm install` (`node_modules/@awb/shared` → `packages/shared` symlink exists);
+  - `"packages"` in `tsconfig.json` `include`.
+
+  Node 26 has been checked to import `.ts` from `@awb/shared/...` through the symlink. Don't run pnpm, git or any other shell command apart from the three verification commands.
+- **File moves:** use your file tools. Create `packages/shared/src/types.ts` and `packages/shared/src/columns.ts` with byte-identical contents, then delete `src/shared/types.ts`, `src/shared/columns.ts` and the `src/shared/` directory. `columns.ts` keeps its relative `./types.ts` import, since both files live in the same package.
+- **Events:** only the two types `BoardEventType` and `BoardEvent` move, to `packages/shared/src/events.ts`, unchanged. `src/domain/events.ts` keeps `EventBus` and adds `import type { BoardEvent } from "@awb/shared/events.ts";`. It must not re-export the types. Retarget the type-only importers:
+  - `src/web/api/useLiveUpdates.ts`
+  - `src/server/routes/events.ts`
+  - `test/claim.test.ts`
+
+  `src/server/app.ts` keeps `import { EventBus } from "../domain/events.ts"`.
+- **Import specifiers:**
+  - `@awb/shared/types.ts`, `@awb/shared/columns.ts` and `@awb/shared/events.ts`, with the `.ts` extension included;
+  - keep `import type` where it is used today;
+  - change only the module specifier on each import line.
+- **Correct Done-when check:** the grep in Done-when matches `@awb/shared/` too, so use this one. It must print nothing:
+  `grep -rnE "from \"(\.\./)+(domain|server|shared)/" src/web`
+  To be sure nothing still points at the old location, this must also print nothing: `grep -rnE "shared/(types|columns)\.ts\"" src test e2e scripts | grep -v "@awb/shared"`.
+- `node bin/awb.js --help` can't be run (shell is limited). Claude will run it.

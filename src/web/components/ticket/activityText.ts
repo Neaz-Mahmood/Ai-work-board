@@ -1,6 +1,6 @@
 import React from "react";
-import type { ActivityEntry, Actor } from "../../../shared/types.ts";
-import { COLUMNS } from "../../../shared/columns.ts";
+import type { ActivityEntry, Actor } from "@awb/shared/types.ts";
+import { COLUMNS } from "@awb/shared/columns.ts";
 import { ActorAvatar } from "../ActorAvatar.tsx";
 
 const COLUMN_NAMES: Record<string, string> = {

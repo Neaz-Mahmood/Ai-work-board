@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { CliIo, GlobalOptions } from "../client.ts";
 import { apiRequest } from "../client.ts";
-import type { Project } from "../../shared/types.ts";
+import type { Project } from "@awb/shared/types.ts";
 
 export type InitOptions = {
   key?: string;

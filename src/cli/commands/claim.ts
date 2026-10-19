@@ -1,7 +1,7 @@
 import type { CliIo, GlobalOptions } from "../client.ts";
 import { apiRequest, CliDomainError } from "../client.ts";
 import { resolveProjectKey } from "../project.ts";
-import type { Ticket } from "../../shared/types.ts";
+import type { Ticket } from "@awb/shared/types.ts";
 
 export type ClaimOptions = {
   feature?: string;

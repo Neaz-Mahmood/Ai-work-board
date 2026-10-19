@@ -1,5 +1,5 @@
 import React from "react";
-import type { Priority } from "../../shared/types.ts";
+import type { Priority } from "@awb/shared/types.ts";
 
 export type PriorityIconProps = {
   priority: Priority;

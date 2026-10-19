@@ -1,4 +1,4 @@
-import type { ColumnId } from "../shared/types.ts";
+import type { ColumnId } from "@awb/shared/types.ts";
 import { CliDomainError } from "./client.ts";
 
 export function parseColumn(raw: string): ColumnId {

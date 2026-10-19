@@ -6,8 +6,8 @@ import type {
   Priority,
   Ticket,
   TicketLink,
-} from "../shared/types.ts";
-import { COLUMNS } from "../shared/columns.ts";
+} from "@awb/shared/types.ts";
+import { COLUMNS } from "@awb/shared/columns.ts";
 import { notFound, validation } from "../server/errors.ts";
 import { ACTOR_NAME, listActors, touchActor } from "./actors.ts";
 import { listActivity, recordActivity } from "./activity.ts";

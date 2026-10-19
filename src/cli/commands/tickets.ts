@@ -4,8 +4,8 @@ import type { CliIo, GlobalOptions } from "../client.ts";
 import { apiRequest, CliDomainError } from "../client.ts";
 import { resolveProjectKey } from "../project.ts";
 import { parseColumn } from "../columns.ts";
-import { COLUMNS } from "../../shared/columns.ts";
-import type { Card, Comment, Ticket } from "../../shared/types.ts";
+import { COLUMNS } from "@awb/shared/columns.ts";
+import type { Card, Comment, Ticket } from "@awb/shared/types.ts";
 
 export type TicketListOptions = {
   column?: string;

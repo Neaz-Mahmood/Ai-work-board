@@ -1,5 +1,5 @@
 import type { Ctx } from "./context.ts";
-import type { Actor } from "../shared/types.ts";
+import type { Actor } from "@awb/shared/types.ts";
 import { validation } from "../server/errors.ts";
 
 export const ACTOR_NAME = /^[A-Za-z0-9._-]{1,40}$/;

@@ -1,5 +1,5 @@
 import type { Ctx } from "./context.ts";
-import type { ActivityEntry } from "../shared/types.ts";
+import type { ActivityEntry } from "@awb/shared/types.ts";
 
 export async function recordActivity(
   ctx: Ctx,

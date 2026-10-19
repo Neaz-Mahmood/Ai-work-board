@@ -6,7 +6,7 @@ import type {
   FeatureWithTickets,
   Priority,
   Ticket,
-} from "../shared/types.ts";
+} from "@awb/shared/types.ts";
 import { conflict, notFound, validation } from "../server/errors.ts";
 import { touchActor } from "./actors.ts";
 import { recordActivity } from "./activity.ts";

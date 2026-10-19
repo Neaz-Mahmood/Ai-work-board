@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Board, Card, ColumnId, Comment, Priority, Ticket } from "../../shared/types.ts";
+import type { Board, Card, ColumnId, Comment, Priority, Ticket } from "@awb/shared/types.ts";
 import type { BoardFilters } from "./board.ts";
 import { api } from "./client.ts";
 import { qk } from "./queryKeys.ts";

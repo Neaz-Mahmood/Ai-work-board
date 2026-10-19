@@ -1,7 +1,7 @@
 import type { CliIo, GlobalOptions } from "../client.ts";
 import { apiRequest } from "../client.ts";
 import { resolveProjectKey } from "../project.ts";
-import type { Board } from "../../shared/types.ts";
+import type { Board } from "@awb/shared/types.ts";
 
 export async function boardCommand(
   io: CliIo,

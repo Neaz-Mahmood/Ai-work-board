@@ -13,7 +13,7 @@ Tasks 04–06 keep the approved batches, but each batch's contents are ordered c
 - [07] Contract: switch storage to PGlite and Postgres — blocked by: 06 — status: done ✅ (agy; Claude removed better-sqlite3 + allowBuilds entry, narrowed SqlParam to exclude undefined, ran the start/restart smoke test; Postgres adapter not yet run against a real server)
 - [08] Server config resolver and hosted-mode detection — blocked by: 07 — status: done ✅ (agy; no fixes needed; Claude added Clarifications and ran the hosted-refusal and local-start smoke tests)
 - [09] Owner auth and API tokens across API, SSE, MCP and CLI — blocked by: 08 — status: done ✅ (agy; no fix rounds; Claude added Clarifications, typed the auth middleware as MiddlewareHandler, and ran a live hosted-mode smoke test)
-- [10] Expand: extract the shared package — blocked by: 07 — status: pending
+- [10] Expand: extract the shared package — blocked by: 07 — status: done ✅ (agy; no fix rounds; Claude did the workspace wiring + pnpm install + tsconfig include up front, deleted the old src/shared files, and fixed the Done-when grep that matched @awb/shared)
 - [11] Split into web and server apps; local mode serves the bundled SPA — blocked by: 09, 10 — status: pending
 - [12] Frontend on its own origin: API URL, CORS, login screen — blocked by: 11 — status: pending
 - [13] Docker image and hosting docs — blocked by: 12 — status: pending

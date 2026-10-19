@@ -1,5 +1,5 @@
 import type { Ctx } from "./context.ts";
-import type { ColumnId, Ticket } from "../shared/types.ts";
+import type { ColumnId, Ticket } from "@awb/shared/types.ts";
 import { notFound, validation } from "../server/errors.ts";
 import { ACTOR_NAME, touchActor } from "./actors.ts";
 import { recordActivity } from "./activity.ts";

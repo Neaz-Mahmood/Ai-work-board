@@ -1,7 +1,7 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Card, Actor } from "../../../shared/types.ts";
+import type { Card, Actor } from "@awb/shared/types.ts";
 import { PriorityIcon } from "../PriorityIcon.tsx";
 import { ActorAvatar } from "../ActorAvatar.tsx";
 import { FeatureLabel } from "../FeatureLabel.tsx";

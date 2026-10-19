@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { Actor, ColumnId, Priority } from "../../../shared/types.ts";
-import { COLUMNS } from "../../../shared/columns.ts";
+import type { Actor, ColumnId, Priority } from "@awb/shared/types.ts";
+import { COLUMNS } from "@awb/shared/columns.ts";
 import { Modal } from "../Modal.tsx";
 import { PriorityIcon } from "../PriorityIcon.tsx";
 import { ActorAvatar } from "../ActorAvatar.tsx";

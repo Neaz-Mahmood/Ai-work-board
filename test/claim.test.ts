@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import type { BoardEvent } from "../src/domain/events.ts";
+import type { BoardEvent } from "@awb/shared/events.ts";
 import {
   makeTestApp,
   runCli,

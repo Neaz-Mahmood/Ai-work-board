@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Project } from "../../shared/types.ts";
+import type { Project } from "@awb/shared/types.ts";
 import { useRenameProject, useDeleteProject } from "../api/projects.ts";
 import { ApiFailure } from "../api/client.ts";
 import { Modal } from "./Modal.tsx";

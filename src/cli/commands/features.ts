@@ -3,7 +3,7 @@ import path from "node:path";
 import type { CliIo, GlobalOptions } from "../client.ts";
 import { apiRequest, CliDomainError } from "../client.ts";
 import { resolveProjectKey } from "../project.ts";
-import type { Feature, FeatureWithTickets, Ticket } from "../../shared/types.ts";
+import type { Feature, FeatureWithTickets, Ticket } from "@awb/shared/types.ts";
 
 export async function featureListCommand(
   io: CliIo,

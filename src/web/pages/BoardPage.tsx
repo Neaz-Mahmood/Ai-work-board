@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { Project } from "../../shared/types.ts";
+import type { Project } from "@awb/shared/types.ts";
 import { useBoard, type BoardFilters as BoardFiltersType } from "../api/board.ts";
 import { useLiveUpdates } from "../api/useLiveUpdates.ts";
 import { Board } from "../components/board/Board.tsx";

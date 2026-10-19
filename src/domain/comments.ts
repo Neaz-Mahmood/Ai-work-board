@@ -1,5 +1,5 @@
 import type { Ctx } from "./context.ts";
-import type { Comment } from "../shared/types.ts";
+import type { Comment } from "@awb/shared/types.ts";
 import { notFound, validation } from "../server/errors.ts";
 import { touchActor } from "./actors.ts";
 import { recordActivity } from "./activity.ts";

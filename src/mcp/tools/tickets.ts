@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Ctx } from "../../domain/context.ts";
-import type { ColumnId, Priority } from "../../shared/types.ts";
+import type { ColumnId, Priority } from "@awb/shared/types.ts";
 import { resolveProject } from "../../domain/projects.ts";
 import {
   createTicket,

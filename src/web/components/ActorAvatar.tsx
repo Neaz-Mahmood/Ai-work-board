@@ -1,5 +1,5 @@
 import React from "react";
-import type { Actor } from "../../shared/types.ts";
+import type { Actor } from "@awb/shared/types.ts";
 
 export type ActorAvatarProps = {
   name: string;

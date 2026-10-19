@@ -7,7 +7,7 @@ import {
   useLocation,
   Link,
 } from "react-router-dom";
-import type { Project } from "../shared/types.ts";
+import type { Project } from "@awb/shared/types.ts";
 import { useProjects } from "./api/projects.ts";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { AddProjectDialog } from "./components/AddProjectDialog.tsx";
