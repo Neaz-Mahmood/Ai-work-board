@@ -10,7 +10,8 @@ export type CallToolResponse = {
 
 export async function connectMcp(
   appOrWrapper: Hono | { app: Hono },
-  actor?: string
+  actor?: string,
+  headers?: Record<string, string>
 ): Promise<Client> {
   const app =
     "app" in appOrWrapper && typeof appOrWrapper.app === "object"
@@ -25,7 +26,18 @@ export async function connectMcp(
   const url = new URL("http://awb.test/mcp" + (actor ? "?actor=" + actor : ""));
   const transport = new StreamableHTTPClientTransport(url, {
     fetch: async (input, init) => {
-      return await app.fetch(new Request(input as any, init));
+      const mergedHeaders = new Headers(init?.headers);
+      if (headers) {
+        for (const [k, v] of Object.entries(headers)) {
+          mergedHeaders.set(k, v);
+        }
+      }
+      return await app.fetch(
+        new Request(input as any, {
+          ...init,
+          headers: mergedHeaders,
+        })
+      );
     },
   });
 

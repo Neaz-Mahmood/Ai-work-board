@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import type { CliIo, GlobalOptions } from "./client.ts";
-import { CliDomainError, ServerUnreachable } from "./client.ts";
+import { AuthFailed, CliDomainError, ServerUnreachable } from "./client.ts";
+import { hashPassword } from "../server/auth.ts";
 import { startCommand } from "./commands/start.ts";
 import { initCommand } from "./commands/init.ts";
 import { projectsCommand } from "./commands/projects.ts";
@@ -31,6 +32,8 @@ const USAGE = `Usage: awb <command> [options]
 Commands:
   start [--host H] [--port N] [--data-dir DIR] [--open]
                  Start the AI Work Board server in the foreground
+  hash-password [<password>]
+                 Hash a password for AWB_OWNER_PASSWORD_HASH
   init [--key KEY] [--name NAME] [--path DIR]
                  Register a directory as a Project
   projects       List registered Projects
@@ -69,12 +72,14 @@ Global Options:
   --json               Output JSON
   --url <url>          Server URL (default: http://127.0.0.1:4747 or AWB_URL)
   -h, --help           Show help
+  Auth: set AWB_TOKEN to send "Authorization: Bearer <token>" to a hosted server
 
 Exit Codes:
   0                    Success
   1                    Domain error
   2                    Usage error
   3                    Server not running
+  4                    Authentication failed
 `;
 
 function getHelpText(cmd?: string, sub?: string): string {
@@ -94,6 +99,14 @@ Options:
   --data-dir <DIR>     Directory for board database (default: ~/.ai-work-board or AWB_HOME)
   --open               Open the board in the default browser on start
   -h, --help           Show help
+`;
+
+    case "hash-password":
+      return `Usage: awb hash-password [<password>]
+
+Hash a password for AWB_OWNER_PASSWORD_HASH.
+
+If <password> is omitted, reads the password from standard input.
 `;
 
     case "init":
@@ -472,6 +485,27 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
 
   try {
     switch (command) {
+      case "hash-password": {
+        let pw = "";
+        if (parsed.positionals.length > 1) {
+          pw = parsed.positionals[1];
+        } else {
+          process.stdin.setEncoding("utf-8");
+          const chunks: string[] = [];
+          for await (const chunk of process.stdin) {
+            chunks.push(chunk as string);
+          }
+          const raw = chunks.join("");
+          pw = raw.replace(/\r?\n$/, "");
+        }
+        if (!pw) {
+          io.stderr(`Password cannot be empty.\n${USAGE}`);
+          return 2;
+        }
+        const hash = hashPassword(pw);
+        io.stdout(`${hash}\n`);
+        return 0;
+      }
       case "start":
         return await startCommand(io, {
           host: parsed.values.host as string | undefined,
@@ -611,6 +645,10 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
         return 2;
     }
   } catch (err: unknown) {
+    if (err instanceof AuthFailed) {
+      io.stderr(`${err.message}\n`);
+      return 4;
+    }
     if (err instanceof CliDomainError) {
       io.stderr(`error: ${err.message}\n`);
       return 1;

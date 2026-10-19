@@ -59,3 +59,33 @@ Local mode stays open, exactly as today.
 - `pnpm test` passes
 - `pnpm typecheck` passes
 - `pnpm test:e2e` passes
+
+## Clarifications (checked against the code)
+- **Which callers to update:** `restActor(c.req.header("X-AWB-Actor"))` is also called in `src/server/routes/projects.ts`. Update every call site in `projects.ts`, `tickets.ts` and `features.ts`.
+- **Request actor helper:** add `src/server/requestActor.ts` exporting `requestActor(c: Context): string`:
+  - owner request → `"you"`;
+  - agent request (Bearer) → `const a = restActor(c.req.header("X-AWB-Actor")); assertAgentActor(a); return a;`;
+  - no auth configured (local mode) → `restActor(c.req.header("X-AWB-Actor"))`, exactly as today. The local UI still sends `you`, and that must keep working.
+- **Context typing:** use Hono's module augmentation in `requestActor.ts`: `declare module "hono" { interface ContextVariableMap { principal: "owner" | "agent" } }`. The middleware does `c.set("principal", ...)`, and `requestActor` reads `c.get("principal")`, which is undefined in local mode. Routes keep their plain `new Hono()`.
+- **401 responses:** the middleware and `/login` return `c.json({ error: { code: "UNAUTHORIZED", message } }, 401)` directly. Use `"Authentication required"` for the middleware and `"Wrong password"` for login. Don't change `DomainError` / `errors.ts`.
+- **Middleware placement:** register it with `app.use(...)` after `app.onError` and before `/api/health` and every route, applied to `/api/*` and `/mcp`. Skip it when `opts.auth` is undefined. Inside it, let `/api/health` and anything under `/api/auth/` pass through. Check the cookie first, then `Authorization: Bearer <t>` (case-insensitive scheme, trimmed token).
+- **Mounting `/api/auth`:** always mount it. `createAuthRoute(ctx, opts.auth)`:
+  - `GET /session`: local mode → `{ authEnabled: false, signedIn: true }`; hosted → `{ authEnabled: true, signedIn: <valid cookie> }`.
+  - `POST /login` in local mode → 200 `{ signedIn: true }`, no cookie.
+  - `POST /logout` → 200 `{ signedIn: false }` (in local mode too); in hosted mode it clears the cookie with `deleteCookie(c, "awb_session", { path: "/" })`.
+  - A missing or non-string `password` → 401 "Wrong password". Don't throw.
+- **Cookie timing:** issued-at and expiry use `ctx.clock.now()`, not `Date.now()`, so tests control time. The value is the decimal string of the ms. Reject it if it isn't a finite integer, if it's more than 30 days old, or if signature verification returns `false`/`undefined`. `maxAge` is `60 * 60 * 24 * 30` seconds.
+- **Constant-time compares:** `tokenMatches` must not short-circuit on length. Compare SHA-256 digests of `given` and each token with `timingSafeEqual` and check every token. `verifyPassword` returns `false` (doesn't throw) for a malformed stored hash.
+- **Test helpers:** give `startTestServer` an optional `opts?: Partial<AppOptions>` and pass it to `makeTestApp`. Add `requestWithHeaders(method, path, { body?, headers? })` returning `{ status, body, headers: Headers }` to `TestApp` (the cookie test needs `Set-Cookie`). Leave the existing `request` signature unchanged.
+- **MCP tests:** give `connectMcp` an optional third parameter `headers?: Record<string, string>`, merged into the custom fetch's init headers. For "401 without credentials" on `/mcp`, a raw `app.request("/mcp", { method: "POST", ... })` returning 401 is enough.
+- **CLI:**
+  - Add `export class AuthFailed extends Error` in `client.ts`, with the exact message from the Do section. `apiRequest` throws it when `res.status === 401`, before the generic error mapping.
+  - `main.ts` catches it next to `ServerUnreachable`, prints the message to stderr, and returns exit code **4**. Add `4                    Authentication failed` under "Exit Codes".
+  - Add `AWB_TOKEN` to Global Options help as: `Auth: set AWB_TOKEN to send "Authorization: Bearer <token>" to a hosted server`.
+- **`hash-password`:**
+  - Runs without contacting a server and prints the hash plus `\n` to stdout.
+  - With no positional argument, read all of `process.stdin` and strip one trailing newline. An empty password → usage error, exit 2.
+  - Add it to USAGE and to `getHelpText`.
+  - Tests use only the argument form.
+- **Server smoke run:** `src/cli/commands/start.ts` passes `auth: config.auth` and nothing else changes.
+- Don't add locks or mutexes. Don't touch `src/web/`, and don't add CORS.

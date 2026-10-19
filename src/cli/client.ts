@@ -21,6 +21,15 @@ export class ServerUnreachable extends Error {
   }
 }
 
+export class AuthFailed extends Error {
+  constructor() {
+    super(
+      "Authentication failed: set AWB_TOKEN to an API token configured on the server (AWB_API_TOKENS)."
+    );
+    this.name = "AuthFailed";
+  }
+}
+
 export class CliDomainError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -40,6 +49,11 @@ export async function apiRequest<T = unknown>(
   const rawUrl = opts.url ?? io.env.AWB_URL ?? "http://127.0.0.1:4747";
   const baseUrl = rawUrl.replace(/\/+$/, "");
   const headers: Record<string, string> = {};
+
+  const token = io.env.AWB_TOKEN;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const actor = opts.as ?? io.env.AWB_ACTOR;
   if (actor) {
@@ -62,6 +76,9 @@ export async function apiRequest<T = unknown>(
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new AuthFailed();
+    }
     let data: any;
     try {
       data = await res.json();

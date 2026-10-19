@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Clock } from "./clock.ts";
 import { systemClock } from "./clock.ts";
@@ -15,6 +15,9 @@ import { createProjectsRoute } from "./routes/projects.ts";
 import { createTicketsRoute } from "./routes/tickets.ts";
 import { createFeaturesRoute } from "./routes/features.ts";
 import { createEventsRoute } from "./routes/events.ts";
+import { createAuthRoute } from "./routes/auth.ts";
+import { verifySessionCookie, tokenMatches } from "./auth.ts";
+import "./requestActor.ts";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { buildMcpServer } from "../mcp/server.ts";
 
@@ -24,6 +27,12 @@ export type AppOptions = {
   staticDir?: string;
   sseHeartbeatMs?: number;
   database?: { kind: "pglite"; dir?: string } | { kind: "postgres"; url: string; schema?: string };
+  auth?: {
+    ownerPasswordHash: string;
+    sessionSecret: string;
+    apiTokens: string[];
+    secureCookies: boolean;
+  };
 };
 
 export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx; close(): Promise<void> }> {
@@ -56,6 +65,48 @@ export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx
     return c.json({ error: { code: "INTERNAL", message: err.message || "Internal server error" } }, 500);
   });
 
+  if (opts.auth) {
+    const authConfig = opts.auth;
+    const authMiddleware: MiddlewareHandler = async (c, next) => {
+      const path = c.req.path;
+      if (
+        path === "/api/health" ||
+        path.startsWith("/api/health/") ||
+        path === "/api/auth" ||
+        path.startsWith("/api/auth/")
+      ) {
+        return next();
+      }
+
+      if (await verifySessionCookie(c, authConfig.sessionSecret, clock)) {
+        c.set("principal", "owner");
+        return next();
+      }
+
+      const authHeader = c.req.header("Authorization");
+      if (authHeader) {
+        const match = authHeader.match(/^bearer\s+(.+)$/i);
+        if (match) {
+          const token = match[1].trim();
+          if (token && tokenMatches(token, authConfig.apiTokens)) {
+            c.set("principal", "agent");
+            return next();
+          }
+        }
+      }
+
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "Authentication required" } },
+        401
+      );
+    };
+
+    app.use("/api/*", authMiddleware);
+    app.use("/api", authMiddleware);
+    app.use("/mcp", authMiddleware);
+    app.use("/mcp/*", authMiddleware);
+  }
+
   const pkgPath = new URL("../../package.json", import.meta.url);
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
   const version = pkg.version as string;
@@ -64,6 +115,7 @@ export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx
     return c.json({ ok: true, version });
   });
 
+  app.route("/api/auth", createAuthRoute(ctx, opts.auth));
   app.route("/api/events", createEventsRoute(ctx, opts.sseHeartbeatMs));
   app.route("/api/projects", createProjectsRoute(ctx));
   app.route("/", createFeaturesRoute(ctx));

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Ctx } from "../../domain/context.ts";
 import { notFound, validation } from "../errors.ts";
-import { restActor } from "../../domain/actors.ts";
+import { requestActor } from "../requestActor.ts";
 import {
   createFeature,
   deleteFeature,
@@ -21,7 +21,7 @@ export function createFeaturesRoute(ctx: Ctx): Hono {
 
   router.post("/api/projects/:key/features", async (c) => {
     const key = c.req.param("key");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -58,7 +58,7 @@ export function createFeaturesRoute(ctx: Ctx): Hono {
     if (Number.isNaN(id)) {
       throw notFound("Feature not found");
     }
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -80,7 +80,7 @@ export function createFeaturesRoute(ctx: Ctx): Hono {
     if (Number.isNaN(id)) {
       throw notFound("Feature not found");
     }
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
     await deleteFeature(ctx, actor, id);
     return c.body(null, 204);
   });

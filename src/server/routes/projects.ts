@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Ctx } from "../../domain/context.ts";
 import { validation } from "../errors.ts";
-import { restActor } from "../../domain/actors.ts";
+import { requestActor } from "../requestActor.ts";
 import {
   createProject,
   deleteProject,
@@ -43,7 +43,7 @@ export function createProjectsRoute(ctx: Ctx): Hono {
       throw validation("Key must be a string");
     }
 
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
     const project = await createProject(
       ctx,
       {
@@ -87,14 +87,14 @@ export function createProjectsRoute(ctx: Ctx): Hono {
       throw validation("Name is required and must be a string");
     }
 
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
     const project = await renameProject(ctx, key, body.name, actor);
     return c.json(project);
   });
 
   router.delete("/:key", async (c) => {
     const key = c.req.param("key");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
     await deleteProject(ctx, key, actor);
     return c.body(null, 204);
   });

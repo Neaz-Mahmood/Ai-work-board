@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import type { Ctx } from "../../domain/context.ts";
 import type { ColumnId, Priority } from "../../shared/types.ts";
 import { validation } from "../errors.ts";
-import { restActor, listActors } from "../../domain/actors.ts";
+import { listActors } from "../../domain/actors.ts";
+import { requestActor } from "../requestActor.ts";
 import {
   createTicket,
   getBoard,
@@ -22,7 +23,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.post("/api/projects/:key/claim", async (c) => {
     const key = c.req.param("key");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any = {};
     try {
@@ -52,7 +53,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.post("/api/projects/:key/tickets", async (c) => {
     const key = c.req.param("key");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -119,7 +120,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.post("/api/tickets/:ticketKey/comments", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -138,7 +139,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.patch("/api/tickets/:ticketKey", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -157,7 +158,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.post("/api/tickets/:ticketKey/move", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -176,14 +177,14 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.delete("/api/tickets/:ticketKey", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
     await deleteTicket(ctx, actor, ticketKey);
     return c.body(null, 204);
   });
 
   router.post("/api/tickets/:ticketKey/blockers", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -207,7 +208,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
   router.delete("/api/tickets/:ticketKey/blockers/:blockerKey", async (c) => {
     const ticketKey = c.req.param("ticketKey");
     const blockerKey = c.req.param("blockerKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     const ticket = await removeBlocker(ctx, actor, ticketKey, blockerKey);
     return c.json(ticket);
@@ -215,7 +216,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.put("/api/tickets/:ticketKey/attention", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     let body: any;
     try {
@@ -234,7 +235,7 @@ export function createTicketsRoute(ctx: Ctx): Hono {
 
   router.delete("/api/tickets/:ticketKey/attention", async (c) => {
     const ticketKey = c.req.param("ticketKey");
-    const actor = restActor(c.req.header("X-AWB-Actor"));
+    const actor = requestActor(c);
 
     const ticket = await clearNeedsAttention(ctx, actor, ticketKey);
     return c.json(ticket);

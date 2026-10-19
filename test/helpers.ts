@@ -31,6 +31,11 @@ export type TestApp = {
     body?: unknown,
     actor?: string
   ): Promise<{ status: number; body: any }>;
+  requestWithHeaders(
+    method: string,
+    path: string,
+    opts?: { body?: unknown; headers?: Record<string, string> }
+  ): Promise<{ status: number; body: any; headers: Headers }>;
   close(): Promise<void>;
 };
 
@@ -95,6 +100,42 @@ export async function makeTestApp(opts?: Partial<AppOptions>): Promise<TestApp> 
     };
   };
 
+  const requestWithHeaders = async (
+    method: string,
+    path: string,
+    reqOpts?: { body?: unknown; headers?: Record<string, string> }
+  ): Promise<{ status: number; body: any; headers: Headers }> => {
+    const headers: Record<string, string> = { ...(reqOpts?.headers ?? {}) };
+    let reqBody: string | undefined = undefined;
+
+    if (reqOpts?.body !== undefined) {
+      if (!headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+      reqBody = JSON.stringify(reqOpts.body);
+    }
+
+    const res = await created.app.request(path, {
+      method,
+      headers,
+      body: reqBody,
+    });
+
+    const text = await res.text();
+    let parsedBody: any;
+    try {
+      parsedBody = text ? JSON.parse(text) : null;
+    } catch {
+      parsedBody = text;
+    }
+
+    return {
+      status: res.status,
+      body: parsedBody,
+      headers: res.headers,
+    };
+  };
+
   const close = async (): Promise<void> => {
     await created.close();
     if (dropSchema && postgresUrl) {
@@ -113,6 +154,7 @@ export async function makeTestApp(opts?: Partial<AppOptions>): Promise<TestApp> 
     ctx: created.ctx,
     dataDir,
     request,
+    requestWithHeaders,
     close,
   };
 }
@@ -125,12 +167,17 @@ export type TestServer = {
     body?: unknown,
     actor?: string
   ): Promise<{ status: number; body: any }>;
+  requestWithHeaders?(
+    method: string,
+    path: string,
+    opts?: { body?: unknown; headers?: Record<string, string> }
+  ): Promise<{ status: number; body: any; headers: Headers }>;
   close(): Promise<void>;
   dataDir: string;
 };
 
-export async function startTestServer(): Promise<TestServer> {
-  const testApp = await makeTestApp();
+export async function startTestServer(opts?: Partial<AppOptions>): Promise<TestServer> {
+  const testApp = await makeTestApp(opts);
   const server = serve({
     fetch: testApp.app.fetch,
     port: 0,
@@ -159,6 +206,7 @@ export async function startTestServer(): Promise<TestServer> {
   return {
     url,
     request: testApp.request,
+    requestWithHeaders: testApp.requestWithHeaders,
     close,
     dataDir: testApp.dataDir,
   };
