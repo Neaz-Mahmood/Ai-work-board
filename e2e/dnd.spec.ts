@@ -225,4 +225,114 @@ test.describe("Pragmatic Drag and Drop Suite", () => {
     await expect(allCards.nth(2)).toHaveAttribute("data-ticket-key", t1.key);
     await expect(allCards.nth(3)).toHaveAttribute("data-ticket-key", t4.key);
   });
+
+  test("One fetch per drop", async ({ page, request }) => {
+    const project = await createProject(request);
+    const t1 = await createTicket(request, project.key, {
+      title: "Card to Move",
+      column: "todo",
+    });
+
+    await page.goto(`/projects/${project.key}`);
+
+    const card = page.locator(`[data-ticket-key="${t1.key}"]`);
+    await expect(card).toBeVisible();
+
+    const emptyColBody = page.locator(
+      '[data-testid="column-in_progress"] .column-body'
+    );
+    await expect(emptyColBody).toBeVisible();
+
+    let count = 0;
+    const countListener = (req: import("@playwright/test").Request) => {
+      if (req.url().includes(`/api/projects/${project.key}/board`)) {
+        count++;
+      }
+    };
+    page.on("request", countListener);
+
+    try {
+      await dragCard(page, card, emptyColBody);
+
+      const inProgressCol = page.locator('[data-testid="column-in_progress"]');
+      await expect(
+        inProgressCol.locator(`[data-ticket-key="${t1.key}"]`)
+      ).toBeVisible();
+
+      await expect.poll(() => count, { timeout: 1500 }).toBe(1);
+      await page.waitForTimeout(1500);
+      expect(count).toBe(1);
+    } finally {
+      page.off("request", countListener);
+    }
+  });
+
+  test("Mid-drag live update", async ({ page, request }) => {
+    const project = await createProject(request);
+    const t1 = await createTicket(request, project.key, {
+      title: "Card to Drag",
+      column: "todo",
+    });
+
+    await page.goto(`/projects/${project.key}`);
+
+    const card = page.locator(`[data-ticket-key="${t1.key}"]`);
+    await expect(card).toBeVisible();
+
+    const box = await card.boundingBox();
+    if (!box) {
+      throw new Error("Could not find bounding box for card");
+    }
+
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+
+    // 1. Press on a card with page.mouse (move to the card centre, down, then move by about 20px in a few steps so Chromium starts a native drag).
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX, startY + 20, { steps: 5 });
+
+    // 2. While it's held, count board requests and create a Ticket through the request fixture (createTicket). Assert that no board request happens within 1s.
+    let boardRequestsDuringDrag = 0;
+    const dragRequestListener = (req: import("@playwright/test").Request) => {
+      if (req.url().includes(`/api/projects/${project.key}/board`)) {
+        boardRequestsDuringDrag++;
+      }
+    };
+    page.on("request", dragRequestListener);
+
+    let newTicketKey = "";
+    try {
+      const newTicket = await createTicket(request, project.key, {
+        title: "Mid-Drag Created Ticket",
+        column: "todo",
+      });
+      newTicketKey = newTicket.key;
+
+      await page.waitForTimeout(1000);
+      expect(boardRequestsDuringDrag).toBe(0);
+
+      // 3. Then move to another Column and up.
+      const targetCol = page.locator(
+        '[data-testid="column-in_progress"] .column-body'
+      );
+      const targetBox = await targetCol.boundingBox();
+      if (!targetBox) {
+        throw new Error("Could not find bounding box for target column");
+      }
+
+      await page.mouse.move(
+        targetBox.x + targetBox.width / 2,
+        targetBox.y + targetBox.height / 2,
+        { steps: 5 }
+      );
+      await page.mouse.up();
+
+      // 4. Assert the new Ticket's card becomes visible.
+      const newCard = page.locator(`[data-ticket-key="${newTicketKey}"]`);
+      await expect(newCard).toBeVisible();
+    } finally {
+      page.off("request", dragRequestListener);
+    }
+  });
 });

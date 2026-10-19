@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { preventUnhandled } from "@atlaskit/pragmatic-drag-and-drop/prevent-unhandled";
 import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import type { Board as BoardType, Card, ColumnId } from "@awb/shared/types.ts";
 import { useMoveTicket, subscribeToast } from "../../api/tickets.ts";
 import type { BoardFilters } from "../../api/board.ts";
 import { Column } from "./Column.tsx";
 import { getDropDestination, type DropTarget } from "./boardDnd.ts";
+import { markBoardDragStarted, markBoardDragEnded } from "./dragActivity.ts";
 import "./board.css";
 
 export type BoardProps = {
@@ -45,9 +47,20 @@ export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps)
   }, [toastError]);
 
   useEffect(() => {
-    return monitorForElements({
+    let dragging = false;
+
+    const cleanup = monitorForElements({
       canMonitor: ({ source }) => source.data.type === "card",
+      onDragStart: () => {
+        dragging = true;
+        markBoardDragStarted();
+        preventUnhandled.start();
+      },
       onDrop: ({ source, location }) => {
+        markBoardDragEnded();
+        preventUnhandled.stop();
+        dragging = false;
+
         const innermost = location.current.dropTargets[0];
         if (!innermost) return;
 
@@ -99,6 +112,15 @@ export function Board({ board, onTicketClick, isFiltered, filters }: BoardProps)
         }
       },
     });
+
+    return () => {
+      cleanup();
+      if (dragging) {
+        dragging = false;
+        markBoardDragEnded();
+        preventUnhandled.stop();
+      }
+    };
   }, []);
 
   const totalCards = board.columns.reduce(

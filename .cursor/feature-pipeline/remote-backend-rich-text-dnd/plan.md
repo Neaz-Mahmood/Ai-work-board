@@ -21,5 +21,5 @@ Tasks 04–06 keep the approved batches, but each batch's contents are ordered c
 - [15] Feature descriptions use the rich text editor — blocked by: 14 — status: done ✅ (agy; no fix rounds; Claude added Clarifications (no second toolbar, editor key per form open, omit description from PATCH when untouched, requestSubmit for Cmd/Ctrl+Enter))
 - [16] Prefactor: pure drag-and-drop destination function — blocked by: 11 — status: done ✅ (agy; no fix rounds; Claude removed the outside-repo viva-os reference and wrote the exact rank rules + dnd-kit equivalence into Clarifications)
 - [17] Switch the Board to Pragmatic drag-and-drop — blocked by: 16 — status: done ✅ (agy; no fix rounds. Claude installed Pragmatic with auto-scroll pinned to 3.2.0 (3.2.1 pulls core 4 → second drag registry), removed @dnd-kit, supplied viva-os excerpts in-repo for the run, and removed a dead SortableTicketCard alias + onClick prop. Drag e2e stable over 5 repeats)
-- [18] Quiet drags: one refetch after a drop — blocked by: 17 — status: pending
+- [18] Quiet drags: one refetch after a drop — blocked by: 17 — status: done ✅ (agy; no fix rounds; Claude inlined the viva-os drag-activity reference and required the flag to clear before any early return in onDrop. Drag e2e stable over 5 repeats)
 - [19] Keyboard moves and announcements — blocked by: 17 — status: pending

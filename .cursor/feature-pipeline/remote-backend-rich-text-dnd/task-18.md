@@ -27,8 +27,6 @@ This task keeps the Board quiet during a drag and refetches it once after a drop
   - Keep "6. Live update" in `e2e/board.spec.ts` passing.
 
 ## Follow these existing patterns
-- `/Users/neazmahmood/Desktop/projects/web/viva-os/viva-os-ui/apps/project-management/src/features/board/board-drag-activity.ts`: the drag-activity flag.
-- `.../features/board/use-board-dnd.ts`: `markBoardDragStarted`/`markBoardDragEnded` and `preventUnhandled` in the monitor.
 - `apps/web/src/api/useLiveUpdates.ts`: the existing event-to-invalidation mapping; reuse it for the buffered flush.
 
 ## Do not
@@ -41,3 +39,44 @@ This task keeps the Board quiet during a drag and refetches it once after a drop
 - `pnpm typecheck` passes
 - `pnpm test` passes
 - `pnpm test:e2e` passes
+
+## Clarifications (checked against the code)
+- **Never read any path outside this repository** (doing so aborts your run). The viva-os reference is inlined here instead:
+  ```ts
+  // viva-os board-drag-activity.ts (complete)
+  let activeDrags = 0;
+  export const markBoardDragStarted = () => { activeDrags += 1; };
+  export const markBoardDragEnded = () => { activeDrags = Math.max(0, activeDrags - 1); };
+  export const isBoardDragActive = () => activeDrags > 0;
+
+  // viva-os use-board-dnd.ts monitor (excerpt)
+  import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
+  monitorForElements({
+    canMonitor: ...,
+    onDragStart: () => { markBoardDragStarted(); preventUnhandled.start(); },
+    onDrop: ({ source, location }) => { markBoardDragEnded(); preventUnhandled.stop(); /* ...then handle the drop */ },
+  });
+  ```
+  `@atlaskit/pragmatic-drag-and-drop/prevent-unhandled` exists in the installed core (3.1.0).
+- **`dragActivity.ts`:** extend the reference with `onBoardDragEnd(listener: () => void): () => void` (a `Set` of listeners). `markBoardDragEnded` calls every listener when the count goes from >0 to 0. Wrap each listener call in try/catch with `console.error`, like `EventBus.emit`.
+- **Board monitor:**
+  - `markBoardDragEnded()` + `preventUnhandled.stop()` must be the **first statements** in `onDrop`, before any early return. `onDrop` also fires for cancelled drags and drops outside any target, so this keeps the flag from getting stuck.
+  - The effect's cleanup, on unmount mid-drag, must end the drag if this monitor started one. Track it with a local `let dragging = false` inside the effect.
+- **`useLiveUpdates` buffering:**
+  - Factor the existing per-event invalidations into a function `invalidateFor(type, ticketKey)`. While `isBoardDragActive()`, add the pending keys to a local `Set` of serialised query keys (`JSON.stringify(key)`) instead of invalidating.
+  - Subscribe to `onBoardDragEnd` inside the same effect (unsubscribe in cleanup). The listener invalidates each pending key once, then clears the set.
+  - The reconnect branch (`es.onopen` after the first open) stays unbuffered.
+- **`useMoveTicket`:** replace `onSettled` with:
+  - `onSuccess`: invalidate `qk.ticket(ticketKey)` and `qk.features(projectKey)`, not the board. Projects are refreshed by the SSE `ticket.*` handler.
+  - `onError`: the existing rollback + toast, plus invalidate `qk.board(projectKey)`.
+  - Don't change `onMutate` or `applyMoveToBoard`.
+- **E2E (`e2e/dnd.spec.ts`):**
+  - *One fetch per drop:* attach `page.on("request")` filtered on `/api/projects/${key}/board` just before `dragCard(...)`. After the drop, wait for the card to be in its new place, then `await expect.poll(() => count, { timeout: 1500 }).toBe(1)`. Then wait out the window with `await page.waitForTimeout(1500)` and assert the count is still `1`. This window is the one place a fixed wait is allowed, because it checks for the absence of extra requests.
+  - *Mid-drag live update:*
+    1. Press on a card with `page.mouse` (`move` to the card centre, `down`, then `move` by about 20px in a few steps so Chromium starts a native drag).
+    2. While it's held, count board requests and create a Ticket through the `request` fixture (`createTicket`). Assert that no board request happens within 1s (`waitForTimeout(1000)` is allowed here for the same reason).
+    3. Then `move` to another Column and `up`.
+    4. Assert the new Ticket's card becomes visible.
+
+    If Chromium won't start a native drag through `page.mouse`, report it instead of skipping the test.
+- Keep `e2e/board.spec.ts` "6. Live update" passing. Don't add locks or mutexes.

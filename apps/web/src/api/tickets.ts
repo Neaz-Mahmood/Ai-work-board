@@ -196,6 +196,12 @@ export function useMoveTicket(projectKey: string, filters?: BoardFilters) {
 
       return { previousQueries };
     },
+    onSuccess: (_data, variables) => {
+      if (variables?.ticketKey) {
+        queryClient.invalidateQueries({ queryKey: qk.ticket(variables.ticketKey) });
+      }
+      queryClient.invalidateQueries({ queryKey: qk.features(projectKey) });
+    },
     onError: (err: unknown, _variables, context) => {
       if (context?.previousQueries) {
         for (const [key, oldBoard] of context.previousQueries) {
@@ -204,14 +210,7 @@ export function useMoveTicket(projectKey: string, filters?: BoardFilters) {
       }
       const message = err instanceof Error ? err.message : String(err);
       showToast(message);
-    },
-    onSettled: (_data, _err, variables) => {
       queryClient.invalidateQueries({ queryKey: qk.board(projectKey) });
-      if (variables?.ticketKey) {
-        queryClient.invalidateQueries({ queryKey: qk.ticket(variables.ticketKey) });
-      }
-      queryClient.invalidateQueries({ queryKey: qk.projects });
-      queryClient.invalidateQueries({ queryKey: qk.features(projectKey) });
     },
   });
 }
