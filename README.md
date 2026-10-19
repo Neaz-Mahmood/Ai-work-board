@@ -12,7 +12,7 @@ Clone the repository and run:
 ```bash
 pnpm install
 pnpm build
-pnpm link --global
+pnpm add -g .
 ```
 This builds both the client UI and the server bundle and links the `awb` executable globally.
 
