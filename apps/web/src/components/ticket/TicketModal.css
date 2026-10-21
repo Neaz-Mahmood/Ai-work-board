@@ -376,25 +376,172 @@
   color: var(--color-text);
 }
 
-.priority-select-container {
+.column-picker {
+  position: relative;
+}
+
+.column-picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px 4px 6px;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.column-picker-trigger:hover {
+  background-color: #ffffff;
+  border-color: #b3b9c4;
+}
+
+.column-picker-trigger:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 1px var(--color-brand);
+}
+
+.column-picker-chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: #626f86;
+  margin-right: 4px;
+}
+
+.column-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.column-chip--backlog {
+  background-color: #f1f2f4;
+  color: #44546f;
+}
+
+.column-chip--todo {
+  background-color: #e9f2ff;
+  color: #0c66e4;
+}
+
+.column-chip--in_progress {
+  background-color: #fff7d6;
+  color: #974f0c;
+}
+
+.column-chip--in_review {
+  background-color: #f3f0ff;
+  color: #5e4db2;
+}
+
+.column-chip--done {
+  background-color: #dffcf0;
+  color: #216e4e;
+}
+
+.column-picker-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(9, 30, 66, 0.15);
+}
+
+.column-picker-option {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.column-picker-option:hover,
+.column-picker-option:focus {
+  outline: none;
+}
+
+.column-picker-option:hover .column-chip,
+.column-picker-option:focus .column-chip {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px currentColor;
+}
+
+.column-picker-option[aria-selected="true"] .column-chip {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.details-menu-value {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.priority-select-container select {
-  flex: 1;
-}
-
-.feature-select-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.feature-select-container select {
-  flex: 1;
   min-width: 0;
+  flex: 1;
+}
+
+.details-menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.column-picker-menu.details-menu {
+  align-items: stretch;
+}
+
+.details-menu-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+}
+
+.details-menu-option .details-menu-label {
+  flex: 1;
+}
+
+.details-menu-option:hover,
+.details-menu-option:focus {
+  outline: none;
+  background-color: var(--color-hover);
+}
+
+.details-menu-option[aria-selected="true"] {
+  background-color: var(--color-brand-subtle);
+}
+
+.feature-color-swatch--none {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  box-sizing: border-box;
 }
 
 .assignee-input-container {
@@ -427,6 +574,11 @@
 }
 
 /* Markdown styling inside ticket modal */
+.markdown-content {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 .markdown-content p {
   margin-top: 0;
   margin-bottom: 8px;
@@ -444,6 +596,7 @@
   padding: 2px 4px;
   border-radius: var(--radius-sm);
   font-size: 85%;
+  overflow-wrap: anywhere;
 }
 
 .markdown-content pre {
@@ -478,14 +631,16 @@
 }
 
 .markdown-content li.task-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  position: relative;
+  padding-left: 22px;
   margin-bottom: 4px;
 }
 
 .markdown-content li.task-list-item input[type="checkbox"] {
-  margin-top: 4px;
+  position: absolute;
+  left: 0;
+  top: 4px;
+  margin: 0;
 }
 
 /* Blockers & Blocks in side panel */

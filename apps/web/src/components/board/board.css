@@ -59,6 +59,72 @@
   flex-shrink: 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  border-radius: 6px 6px 0 0;
+}
+
+.board-column[data-column-id="backlog"] {
+  background-color: color-mix(in srgb, #f1f2f4 40%, white);
+}
+
+.board-column[data-column-id="backlog"] .column-header {
+  background-color: #f1f2f4;
+  color: #44546f;
+}
+
+.board-column[data-column-id="backlog"].is-over {
+  background-color: #e4e6ea;
+}
+
+.board-column[data-column-id="todo"] {
+  background-color: color-mix(in srgb, #e9f2ff 40%, white);
+}
+
+.board-column[data-column-id="todo"] .column-header {
+  background-color: #e9f2ff;
+  color: #0c66e4;
+}
+
+.board-column[data-column-id="todo"].is-over {
+  background-color: #d4e6ff;
+}
+
+.board-column[data-column-id="in_progress"] {
+  background-color: color-mix(in srgb, #fff7d6 40%, white);
+}
+
+.board-column[data-column-id="in_progress"] .column-header {
+  background-color: #fff7d6;
+  color: #974f0c;
+}
+
+.board-column[data-column-id="in_progress"].is-over {
+  background-color: #ffefad;
+}
+
+.board-column[data-column-id="in_review"] {
+  background-color: color-mix(in srgb, #f3f0ff 40%, white);
+}
+
+.board-column[data-column-id="in_review"] .column-header {
+  background-color: #f3f0ff;
+  color: #5e4db2;
+}
+
+.board-column[data-column-id="in_review"].is-over {
+  background-color: #e4dcff;
+}
+
+.board-column[data-column-id="done"] {
+  background-color: color-mix(in srgb, #dffcf0 40%, white);
+}
+
+.board-column[data-column-id="done"] .column-header {
+  background-color: #dffcf0;
+  color: #216e4e;
+}
+
+.board-column[data-column-id="done"].is-over {
+  background-color: #bff6e0;
 }
 
 .column-name {
@@ -68,7 +134,7 @@
 .column-count {
   font-size: var(--font-size-xs, 11px);
   font-weight: 700;
-  color: var(--color-text-subtle, #626F86);
+  color: inherit;
 }
 
 .column-body {
