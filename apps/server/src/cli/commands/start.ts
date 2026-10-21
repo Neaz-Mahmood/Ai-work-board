@@ -11,15 +11,20 @@ export type StartOptions = {
   port?: string;
   "data-dir"?: string;
   open?: boolean;
+  mode?: string;
 };
 
 export async function startCommand(io: CliIo, values: StartOptions): Promise<number> {
   let config;
   try {
+    if (values.mode !== undefined && values.mode !== "local" && values.mode !== "hosted") {
+      throw new ConfigError(`Invalid --mode: ${values.mode} (expected "local" or "hosted")`);
+    }
     config = resolveServerConfig(io.env, {
       host: values.host,
       port: values.port,
       dataDir: values["data-dir"],
+      mode: values.mode,
     });
   } catch (err: unknown) {
     if (err instanceof ConfigError) {
@@ -77,7 +82,12 @@ export async function startCommand(io: CliIo, values: StartOptions): Promise<num
     server.on("listening", () => {
       const urlHost = config.host.includes(":") ? `[${config.host}]` : config.host;
       const url = `http://${urlHost}:${config.port}`;
-      io.stdout(`AI Work Board running at ${url}\n`);
+      io.stdout(`AI Work Board running at ${url} (${config.mode} mode)\n`);
+      if (config.mode === "local" && config.databaseUrl !== undefined) {
+        io.stdout(
+          `[info] using PostgreSQL via DATABASE_URL in local mode (no auth)\n`
+        );
+      }
       if (values.open && config.mode === "local") {
         try {
           cp.spawn("open", [url], { detached: true, stdio: "ignore" }).unref();

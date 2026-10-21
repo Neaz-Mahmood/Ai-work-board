@@ -457,8 +457,8 @@ describe("Tickets Edit and Move REST API", () => {
     expect(moveCNoop.body.activity).toHaveLength(actCountBefore);
   });
 
-  test("position clamping", async () => {
-    // Project CLAMP
+  test("out-of-range positions are rejected rather than clamped", async () => {
+    // Project CLMP
     const clampDir = path.join(tempBase, "repo-clamp");
     fs.mkdirSync(clampDir, { recursive: true });
     await testApp.request("POST", "/api/projects", {
@@ -478,31 +478,52 @@ describe("Tickets Edit and Move REST API", () => {
     const key1 = t1.body.key;
     const key2 = t2.body.key;
 
-    // Moving key2 with position: -5 should clamp to 0 (top)
+    // Out-of-range positions are rejected, not clamped.
     const resNeg = await testApp.request(
       "POST",
       `/api/tickets/${key2}/move`,
       { column: "todo", position: -5 }
     );
-    expect(resNeg.status).toBe(200);
-    expect(resNeg.body.rank).toBe(0);
+    expect(resNeg.status).toBe(400);
+    expect(resNeg.body.error.code).toBe("VALIDATION");
 
-    // key1 should now be at rank 1
-    const get1 = await testApp.request("GET", `/api/tickets/${key1}`);
-    expect(get1.body.rank).toBe(1);
+    // A rejected move must leave the ordering untouched.
+    const getAfterNeg = await testApp.request("GET", `/api/tickets/${key1}`);
+    expect(getAfterNeg.body.rank).toBe(0);
+    const getKey2AfterNeg = await testApp.request("GET", `/api/tickets/${key2}`);
+    expect(getKey2AfterNeg.body.rank).toBe(1);
 
-    // Moving key2 with position: 999 should clamp to count (1 other ticket -> position 1)
     const resHuge = await testApp.request(
       "POST",
       `/api/tickets/${key2}/move`,
       { column: "todo", position: 999 }
     );
-    expect(resHuge.status).toBe(200);
-    expect(resHuge.body.rank).toBe(1);
+    expect(resHuge.status).toBe(400);
+    expect(resHuge.body.error.code).toBe("VALIDATION");
 
-    // key1 should now be back at rank 0
+    // A fractional position is rejected as well.
+    const resFractional = await testApp.request(
+      "POST",
+      `/api/tickets/${key2}/move`,
+      { column: "todo", position: 0.5 }
+    );
+    expect(resFractional.status).toBe(400);
+    expect(resFractional.body.error.code).toBe("VALIDATION");
+
+    // Ordering is still untouched after all three rejections.
     const get1Again = await testApp.request("GET", `/api/tickets/${key1}`);
     expect(get1Again.body.rank).toBe(0);
+    const get2Again = await testApp.request("GET", `/api/tickets/${key2}`);
+    expect(get2Again.body.rank).toBe(1);
+
+    // An in-range position still moves the ticket.
+    const resValid = await testApp.request(
+      "POST",
+      `/api/tickets/${key2}/move`,
+      { column: "todo", position: 0 }
+    );
+    expect(resValid.status).toBe(200);
+    expect(resValid.body.rank).toBe(0);
   });
 
   test("ranks stay dense 0..n-1 in both Columns after a sequence of moves", async () => {

@@ -478,4 +478,98 @@ describe("Tickets REST API", () => {
     expect(botActor).toBeDefined();
     expect(botActor.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
+
+  describe("move position validation", () => {
+    const KEY = "PRJP";
+    let repo: string;
+    let keys: string[] = [];
+
+    beforeAll(async () => {
+      repo = path.join(tempBase, "repo-position");
+      fs.mkdirSync(repo, { recursive: true });
+      await testApp.request("POST", "/api/projects", {
+        path: repo,
+        name: "Position Project",
+        key: KEY,
+      });
+
+      // Three tickets in backlog: A (rank 0), B (rank 1), C (rank 2)
+      for (const title of ["A", "B", "C"]) {
+        const res = await testApp.request("POST", `/api/projects/${KEY}/tickets`, { title });
+        expect(res.status).toBe(201);
+        keys.push(res.body.key);
+      }
+    });
+
+    async function backlogOrder(): Promise<string[]> {
+      const res = await testApp.request("GET", `/api/projects/${KEY}/tickets?column=backlog`);
+      return res.body.map((t: any) => t.title);
+    }
+
+    test("rejects a position above the column size", async () => {
+      const res = await testApp.request(
+        "POST",
+        `/api/tickets/${keys[0]}/move`,
+        { column: "backlog", position: 99 }
+      );
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("VALIDATION");
+      expect(res.body.error.message).toContain("between 0 and 2");
+    });
+
+    test("rejects a negative position", async () => {
+      const res = await testApp.request(
+        "POST",
+        `/api/tickets/${keys[0]}/move`,
+        { column: "backlog", position: -1 }
+      );
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("VALIDATION");
+    });
+
+    test("rejects a non-integer position", async () => {
+      const res = await testApp.request(
+        "POST",
+        `/api/tickets/${keys[0]}/move`,
+        { column: "backlog", position: 1.5 }
+      );
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("VALIDATION");
+      expect(res.body.error.message).toContain("integer");
+    });
+
+    test("omitted position appends to the bottom", async () => {
+      // Move C to todo and back without a position; it should land last in backlog.
+      await testApp.request("POST", `/api/tickets/${keys[2]}/move`, { column: "todo" });
+      const res = await testApp.request(
+        "POST",
+        `/api/tickets/${keys[2]}/move`,
+        { column: "backlog" }
+      );
+      expect(res.status).toBe(200);
+      expect(await backlogOrder()).toEqual(["A", "B", "C"]);
+    });
+
+    test("position 0 places first", async () => {
+      const res = await testApp.request(
+        "POST",
+        `/api/tickets/${keys[2]}/move`,
+        { column: "backlog", position: 0 }
+      );
+      expect(res.status).toBe(200);
+      expect(await backlogOrder()).toEqual(["C", "A", "B"]);
+    });
+
+    test("position equal to the column size places last", async () => {
+      // Backlog currently holds two other tickets, so count for the moved
+      // ticket's own position space is 2.
+      const res = await testApp.request(
+        "POST",
+        `/api/tickets/${keys[2]}/move`,
+        { column: "backlog", position: 2 }
+      );
+      expect(res.status).toBe(200);
+      expect(await backlogOrder()).toEqual(["A", "B", "C"]);
+    });
+  });
 });

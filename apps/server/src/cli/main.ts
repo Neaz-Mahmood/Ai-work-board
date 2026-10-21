@@ -30,7 +30,7 @@ export type { CliIo } from "./client.ts";
 const USAGE = `Usage: awb <command> [options]
 
 Commands:
-  start [--host H] [--port N] [--data-dir DIR] [--open]
+  start [--host H] [--port N] [--data-dir DIR] [--open] [--mode local|hosted]
                  Start the AI Work Board server in the foreground
   hash-password [<password>]
                  Hash a password for AWB_OWNER_PASSWORD_HASH
@@ -89,16 +89,21 @@ function getHelpText(cmd?: string, sub?: string): string {
 
   switch (cmd) {
     case "start":
-      return `Usage: awb start [--host H] [--port N] [--data-dir DIR] [--open]
+      return `Usage: awb start [--host H] [--port N] [--data-dir DIR] [--open] [--mode local|hosted]
 
 Start the AI Work Board server in the foreground.
 
 Options:
   --host <H>           Interface to bind (default: 127.0.0.1 or AWB_HOST)
   --port <N>           Port to listen on (default: 4747 or AWB_PORT)
-  --data-dir <DIR>     Directory for board database (default: ~/.ai-work-board or AWB_HOME)
+  --data-dir <DIR>     Directory for board data (default: ~/.ai-work-board or AWB_HOME)
   --open               Open the board in the default browser on start
+  --mode <M>           local (default on loopback) or hosted (default on non-loopback)
   -h, --help           Show help
+
+Notes:
+  Hosted mode requires AWB_OWNER_PASSWORD_HASH, AWB_SESSION_SECRET, and AWB_API_TOKENS.
+  Setting DATABASE_URL does not switch modes; use --mode hosted (or AWB_MODE=hosted).
 `;
 
     case "hash-password":
@@ -419,6 +424,7 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
         port: { type: "string" },
         "data-dir": { type: "string" },
         open: { type: "boolean" },
+        mode: { type: "string" },
 
         // init options
         key: { type: "string" },
@@ -512,6 +518,7 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
           port: parsed.values.port as string | undefined,
           "data-dir": parsed.values["data-dir"] as string | undefined,
           open: parsed.values.open as boolean | undefined,
+          mode: parsed.values.mode as string | undefined,
         });
       case "init":
         return await initCommand(io, globalOpts, {
