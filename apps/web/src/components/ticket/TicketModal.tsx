@@ -43,6 +43,32 @@ const PRIORITIES: { id: Priority; name: string }[] = [
   { id: "lowest", name: "Lowest" },
 ];
 
+function LinkIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+function buildTicketUrl(ticketKey: string): string {
+  const url = new URL(window.location.href);
+  const share = new URL(url.pathname, url.origin);
+  share.searchParams.set("selectedIssue", ticketKey);
+  return share.toString();
+}
+
 function DetailsMenu({
   id,
   listboxId,
@@ -217,7 +243,9 @@ export function TicketModal({
   // Menu state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // In-place title edit
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -247,7 +275,41 @@ export function TicketModal({
     setAttentionDraft("");
     setIsEditingDesc(false);
     setDescDirty(false);
+    setLinkCopied(false);
   }, [ticketKey]);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyTicketUrl = async (key: string) => {
+    const url = buildTicketUrl(key);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    setLinkCopied(true);
+    if (copyResetTimeoutRef.current) {
+      clearTimeout(copyResetTimeoutRef.current);
+    }
+    copyResetTimeoutRef.current = setTimeout(() => {
+      setLinkCopied(false);
+      copyResetTimeoutRef.current = null;
+    }, 1500);
+  };
 
   const handleResolveAttention = () => {
     if (!ticket || clearNeedsAttention.isPending) return;
@@ -339,14 +401,27 @@ export function TicketModal({
       <Modal isOpen={isOpen} onClose={onClose} maxWidth="960px" ariaLabel="Ticket not found">
         <div className="ticket-modal-header">
           <span className="ticket-modal-key">{ticketKey}</span>
-          <button
-            type="button"
-            className="modal-close-button"
-            onClick={onClose}
-            aria-label="Close dialog"
-          >
-            ✕
-          </button>
+          <div className="ticket-modal-header-actions">
+            {ticketKey && (
+              <button
+                type="button"
+                className="ticket-modal-copy-link"
+                onClick={() => handleCopyTicketUrl(ticketKey)}
+                aria-label={linkCopied ? "Ticket link copied" : "Copy ticket link"}
+                title={linkCopied ? "Copied!" : "Copy ticket link"}
+              >
+                <LinkIcon />
+              </button>
+            )}
+            <button
+              type="button"
+              className="modal-close-button"
+              onClick={onClose}
+              aria-label="Close dialog"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         <div className="ticket-modal-error">
           {error instanceof Error ? error.message : `Ticket ${ticketKey} not found`}
@@ -450,7 +525,7 @@ export function TicketModal({
           <div className="ticket-modal-header">
             <span className="ticket-modal-key">{ticket.key}</span>
             <div className="ticket-modal-header-actions">
-              <div ref={menuRef}>
+              <div className="ticket-modal-menu" ref={menuRef}>
                 <button
                   type="button"
                   className="ticket-modal-menu-trigger"
@@ -477,6 +552,15 @@ export function TicketModal({
                   </div>
                 )}
               </div>
+              <button
+                type="button"
+                className="ticket-modal-copy-link"
+                onClick={() => handleCopyTicketUrl(ticket.key)}
+                aria-label={linkCopied ? "Ticket link copied" : "Copy ticket link"}
+                title={linkCopied ? "Copied!" : "Copy ticket link"}
+              >
+                <LinkIcon />
+              </button>
               <button
                 type="button"
                 className="modal-close-button"
