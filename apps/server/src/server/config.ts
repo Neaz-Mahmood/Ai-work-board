@@ -24,10 +24,13 @@ export type ServerConfig = {
   };
 };
 
+export type ServerConfigMode = "local" | "hosted";
+
 export type ServerConfigFlags = {
   host?: string;
   port?: string;
   dataDir?: string;
+  mode?: ServerConfigMode;
 };
 
 function clean(val: string | undefined): string | undefined {
@@ -42,6 +45,13 @@ function parseCommaList(val: string | undefined): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+function parseMode(val: string | undefined): ServerConfigMode | undefined {
+  if (val === undefined) return undefined;
+  const lower = val.trim().toLowerCase();
+  if (lower === "local" || lower === "hosted") return lower;
+  throw new ConfigError(`Invalid mode: ${val} (expected "local" or "hosted")`);
 }
 
 export function resolveServerConfig(
@@ -73,7 +83,13 @@ export function resolveServerConfig(
   const allowedOrigins = parseCommaList(env.AWB_ALLOWED_ORIGINS);
 
   const isLoopback = host === "127.0.0.1" || host === "localhost" || host === "::1";
-  const mode: "local" | "hosted" = (!isLoopback || databaseUrl !== undefined) ? "hosted" : "local";
+
+  // Mode is opt-in: an explicit `--mode` / AWB_MODE always wins. Otherwise a
+  // non-loopback host implies hosted mode. DATABASE_URL deliberately does NOT
+  // imply hosted mode -- pointing a local server at Postgres is a supported
+  // setup that should not silently turn on auth requirements.
+  const explicitMode = flags?.mode ?? parseMode(clean(env.AWB_MODE));
+  const mode: ServerConfigMode = explicitMode ?? (isLoopback ? "local" : "hosted");
 
   let auth: ServerConfig["auth"];
   if (mode === "hosted") {

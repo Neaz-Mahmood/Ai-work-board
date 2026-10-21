@@ -228,6 +228,14 @@ describe("CLI Ticket Update and Move commands", () => {
       { url: server.url, cwd: repoDir }
     );
     expect(resBadPos.code).toBe(1);
-    expect(resBadPos.stderr).toContain("Position must be a number");
+    expect(resBadPos.stderr).toContain("Position must be a whole number");
+
+    // A fractional position is rejected too, rather than truncated to an int.
+    const resFractional = await runCli(
+      ["ticket", "move", "CLED-1", "todo", "--position", "1.7"],
+      { url: server.url, cwd: repoDir }
+    );
+    expect(resFractional.code).toBe(1);
+    expect(resFractional.stderr).toContain("Position must be a whole number");
   });
 });

@@ -426,11 +426,14 @@ export async function ticketMoveCommand(
 
   let position: number | undefined = undefined;
   if (values.position !== undefined) {
-    const pos = parseInt(values.position, 10);
-    if (Number.isNaN(pos)) {
-      throw new CliDomainError("VALIDATION", "Position must be a number");
+    const trimmed = values.position.trim();
+    if (!/^-?\d+$/.test(trimmed)) {
+      throw new CliDomainError(
+        "VALIDATION",
+        `Position must be a whole number, received "${values.position}".`
+      );
     }
-    position = pos;
+    position = Number(trimmed);
   }
 
   const body: Record<string, unknown> = { column };

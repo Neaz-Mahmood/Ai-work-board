@@ -629,6 +629,31 @@ export async function compactColumnRanks(
   }
 }
 
+/**
+ * Resolve a requested insertion position within a column of `count` tickets.
+ *
+ * An omitted position means "append to the bottom". An explicit position must
+ * be an integer in [0, count] -- out-of-range values are rejected rather than
+ * silently clamped, so a caller passing a stale or wrong index gets an error
+ * instead of a move somewhere they did not ask for.
+ */
+function resolveTargetPosition(position: number | null | undefined, count: number): number {
+  if (position === undefined || position === null) {
+    return count; // omitted -> bottom
+  }
+  if (typeof position !== "number" || !Number.isInteger(position)) {
+    throw validation(`Position must be an integer, received ${JSON.stringify(position)}.`);
+  }
+  if (position < 0 || position > count) {
+    throw validation(
+      `Position must be between 0 and ${count} (the column currently has ${count} ticket${
+        count === 1 ? "" : "s"
+      }); omit it to append to the bottom.`
+    );
+  }
+  return position;
+}
+
 export async function insertTicketAtRank(
   ctx: Ctx,
   ticketId: number,
@@ -644,12 +669,7 @@ export async function insertTicketAtRank(
     ticketId
   );
   const count = targetColTickets.length;
-  let targetPos: number;
-  if (position === undefined || position === null) {
-    targetPos = count; // missing -> bottom
-  } else {
-    targetPos = Math.max(0, Math.min(count, position));
-  }
+  const targetPos = resolveTargetPosition(position, count);
 
   const newTargetOrder = [
     ...targetColTickets.slice(0, targetPos),
@@ -778,12 +798,7 @@ export async function moveTicket(
       );
 
       const count = otherTickets.length;
-      let targetPos: number;
-      if (input.position === undefined || input.position === null) {
-        targetPos = count; // missing -> bottom
-      } else {
-        targetPos = Math.max(0, Math.min(count, input.position));
-      }
+      const targetPos = resolveTargetPosition(input.position, count);
 
       if (targetPos !== oldRank) {
         changed = true;

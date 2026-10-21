@@ -55,9 +55,21 @@ describe("resolveServerConfig", () => {
     expect(config.auth?.secureCookies).toBe(true);
   });
 
-  test("DATABASE_URL on loopback -> hosted", () => {
+  test("DATABASE_URL alone does NOT flip loopback into hosted mode", () => {
     const config = resolveServerConfig({
       AWB_HOST: "127.0.0.1",
+      DATABASE_URL: "postgres://localhost:5432/db",
+    });
+    expect(config.mode).toBe("local");
+    expect(config.host).toBe("127.0.0.1");
+    expect(config.databaseUrl).toBe("postgres://localhost:5432/db");
+    expect(config.auth).toBeUndefined();
+  });
+
+  test("AWB_MODE=hosted opts into hosted mode on loopback", () => {
+    const config = resolveServerConfig({
+      AWB_HOST: "127.0.0.1",
+      AWB_MODE: "hosted",
       DATABASE_URL: "postgres://localhost:5432/db",
       AWB_OWNER_PASSWORD_HASH: "hash",
       AWB_SESSION_SECRET: "secret",
@@ -66,7 +78,48 @@ describe("resolveServerConfig", () => {
     expect(config.mode).toBe("hosted");
     expect(config.host).toBe("127.0.0.1");
     expect(config.databaseUrl).toBe("postgres://localhost:5432/db");
+    // Loopback stays non-secure cookies even in hosted mode.
     expect(config.auth?.secureCookies).toBe(false);
+  });
+
+  test("AWB_MODE=local forces local mode even on non-loopback", () => {
+    const config = resolveServerConfig({
+      AWB_HOST: "0.0.0.0",
+      AWB_MODE: "local",
+      AWB_OWNER_PASSWORD_HASH: "hash",
+      AWB_SESSION_SECRET: "secret",
+      AWB_API_TOKENS: "tok",
+    });
+    expect(config.mode).toBe("local");
+    expect(config.auth).toBeUndefined();
+  });
+
+  test("flags.mode beats AWB_MODE env", () => {
+    const config = resolveServerConfig(
+      {
+        AWB_MODE: "local",
+        AWB_OWNER_PASSWORD_HASH: "hash",
+        AWB_SESSION_SECRET: "secret",
+        AWB_API_TOKENS: "tok",
+      },
+      { mode: "hosted" }
+    );
+    expect(config.mode).toBe("hosted");
+    expect(config.auth).toBeDefined();
+  });
+
+  test("an invalid AWB_MODE throws ConfigError", () => {
+    expect(() => resolveServerConfig({ AWB_MODE: "prod" })).toThrowError(
+      new ConfigError(`Invalid mode: prod (expected "local" or "hosted")`)
+    );
+  });
+
+  test("AWB_MODE=hosted on loopback with no auth vars still errors", () => {
+    expect(() =>
+      resolveServerConfig({ AWB_HOST: "127.0.0.1", AWB_MODE: "hosted" })
+    ).toThrow(
+      "Hosted mode requires: AWB_OWNER_PASSWORD_HASH, AWB_SESSION_SECRET, AWB_API_TOKENS"
+    );
   });
 
   test("hosted with nothing set -> the error lists all three variables", () => {
