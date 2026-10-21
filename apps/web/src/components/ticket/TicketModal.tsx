@@ -20,7 +20,7 @@ import {
 } from "../../api/tickets.ts";
 import { ActivityItem, formatRelativeTime } from "./activityText.ts";
 import { useFeatures } from "../../api/features.ts";
-import { FeatureLabel } from "../FeatureLabel.tsx";
+import "../features/features.css";
 import "./TicketModal.css";
 
 const COLUMN_NAMES: Record<string, string> = {
@@ -33,6 +33,151 @@ const COLUMN_NAMES: Record<string, string> = {
 
 for (const col of COLUMNS) {
   COLUMN_NAMES[col.id] = col.name;
+}
+
+const PRIORITIES: { id: Priority; name: string }[] = [
+  { id: "highest", name: "Highest" },
+  { id: "high", name: "High" },
+  { id: "medium", name: "Medium" },
+  { id: "low", name: "Low" },
+  { id: "lowest", name: "Lowest" },
+];
+
+function DetailsMenu({
+  id,
+  listboxId,
+  label,
+  value,
+  options,
+  onChange,
+  menuClassName = "column-picker-menu",
+  optionClassName = "column-picker-option",
+}: {
+  id: string;
+  listboxId: string;
+  label: string;
+  value: string;
+  options: { value: string; label: string; content: React.ReactNode }[];
+  onChange: (value: string) => void;
+  menuClassName?: string;
+  optionClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    const selected = rootRef.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
+    selected?.focus();
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const moveFocus = (currentEl: HTMLElement, direction: 1 | -1) => {
+    const items = [
+      ...currentEl.parentElement!.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ];
+    const index = items.indexOf(currentEl as HTMLButtonElement);
+    const next = items[index + direction] ?? items[direction === 1 ? 0 : items.length - 1];
+    next?.focus();
+  };
+
+  return (
+    <div className="column-picker" ref={rootRef}>
+      <button
+        type="button"
+        id={id}
+        className="column-picker-trigger"
+        aria-label={`${label}: ${current?.label ?? ""}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        onClick={() => setOpen((isOpen) => !isOpen)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        <span className="details-menu-value">{current?.content}</span>
+        <svg className="column-picker-chevron" viewBox="0 0 16 16" aria-hidden="true">
+          <path
+            d="M4 6.5 8 10.5 12 6.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {open && (
+        <div id={listboxId} className={menuClassName} role="listbox" aria-label={label}>
+          {options.map((option) => (
+            <button
+              key={option.value || "none"}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              className={optionClassName}
+              onClick={() => {
+                if (option.value !== value) onChange(option.value);
+                setOpen(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  moveFocus(e.currentTarget, 1);
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  moveFocus(e.currentTarget, -1);
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpen(false);
+                  rootRef.current?.querySelector<HTMLButtonElement>(".column-picker-trigger")?.focus();
+                }
+              }}
+            >
+              {option.content}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColumnPicker({
+  value,
+  onChange,
+}: {
+  value: ColumnId;
+  onChange: (column: ColumnId) => void;
+}) {
+  return (
+    <DetailsMenu
+      id="ticket-column-select"
+      listboxId="ticket-column-listbox"
+      label="Column"
+      value={value}
+      onChange={(column) => onChange(column as ColumnId)}
+      options={COLUMNS.map((col) => ({
+        value: col.id,
+        label: col.name,
+        content: <span className={`column-chip column-chip--${col.id}`}>{col.name}</span>,
+      }))}
+    />
+  );
 }
 
 export type TicketModalProps = {
@@ -604,25 +749,16 @@ export function TicketModal({
                 <label htmlFor="ticket-column-select" className="details-label">
                   Column
                 </label>
-                <select
-                  id="ticket-column-select"
+                <ColumnPicker
+                  key={ticket.key}
                   value={ticket.column}
-                  onChange={(e) => {
-                    const newColumn = e.target.value as ColumnId;
-                    if (newColumn !== ticket.column) {
-                      moveTicket.mutate({
-                        ticketKey: ticket.key,
-                        column: newColumn,
-                      });
-                    }
+                  onChange={(column) => {
+                    moveTicket.mutate({
+                      ticketKey: ticket.key,
+                      column,
+                    });
                   }}
-                >
-                  {COLUMNS.map((col) => (
-                    <option key={col.id} value={col.id}>
-                      {col.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Assignee Input */}
@@ -661,28 +797,32 @@ export function TicketModal({
                 <label htmlFor="ticket-priority-select" className="details-label">
                   Priority
                 </label>
-                <div className="priority-select-container">
-                  <PriorityIcon priority={ticket.priority} />
-                  <select
-                    id="ticket-priority-select"
-                    value={ticket.priority}
-                    onChange={(e) => {
-                      const newPriority = e.target.value as Priority;
-                      if (newPriority !== ticket.priority) {
-                        updateTicket.mutate({
-                          ticketKey: ticket.key,
-                          patch: { priority: newPriority },
-                        });
-                      }
-                    }}
-                  >
-                    <option value="highest">Highest</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                    <option value="lowest">Lowest</option>
-                  </select>
-                </div>
+                <DetailsMenu
+                  id="ticket-priority-select"
+                  listboxId="ticket-priority-listbox"
+                  label="Priority"
+                  value={ticket.priority}
+                  menuClassName="column-picker-menu details-menu"
+                  optionClassName="details-menu-option"
+                  onChange={(priority) => {
+                    if (priority !== ticket.priority) {
+                      updateTicket.mutate({
+                        ticketKey: ticket.key,
+                        patch: { priority: priority as Priority },
+                      });
+                    }
+                  }}
+                  options={PRIORITIES.map((priority) => ({
+                    value: priority.id,
+                    label: priority.name,
+                    content: (
+                      <>
+                        <PriorityIcon priority={priority.id} />
+                        <span className="details-menu-label">{priority.name}</span>
+                      </>
+                    ),
+                  }))}
+                />
               </div>
 
               {/* Feature Select */}
@@ -690,36 +830,65 @@ export function TicketModal({
                 <label htmlFor="ticket-feature-select" className="details-label">
                   Feature
                 </label>
-                <div className="feature-select-container">
-                  {ticket.feature && (
-                    <FeatureLabel feature={ticket.feature} />
-                  )}
-                  <select
-                    id="ticket-feature-select"
-                    value={ticket.feature?.id ? String(ticket.feature.id) : ""}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const featureId = val === "" ? null : parseInt(val, 10);
-                      updateTicket.mutate({
-                        ticketKey: ticket.key,
-                        projectKey: resolvedProjectKey,
-                        patch: { featureId },
-                      });
-                    }}
-                  >
-                    <option value="">None</option>
-                    {ticket.feature && !features?.some((f) => f.id === ticket.feature?.id) && (
-                      <option value={String(ticket.feature.id)}>
-                        {ticket.feature.name}
-                      </option>
-                    )}
-                    {features?.map((f) => (
-                      <option key={f.id} value={String(f.id)}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <DetailsMenu
+                  id="ticket-feature-select"
+                  listboxId="ticket-feature-listbox"
+                  label="Feature"
+                  value={ticket.feature?.id ? String(ticket.feature.id) : ""}
+                  menuClassName="column-picker-menu details-menu"
+                  optionClassName="details-menu-option"
+                  onChange={(val) => {
+                    const current = ticket.feature?.id ? String(ticket.feature.id) : "";
+                    if (val === current) return;
+                    updateTicket.mutate({
+                      ticketKey: ticket.key,
+                      projectKey: resolvedProjectKey,
+                      patch: { featureId: val === "" ? null : parseInt(val, 10) },
+                    });
+                  }}
+                  options={[
+                    {
+                      value: "",
+                      label: "None",
+                      content: (
+                        <>
+                          <span className="feature-color-swatch feature-color-swatch--none" aria-hidden />
+                          <span className="details-menu-label">None</span>
+                        </>
+                      ),
+                    },
+                    ...(ticket.feature && !features?.some((f) => f.id === ticket.feature?.id)
+                      ? [{
+                          value: String(ticket.feature.id),
+                          label: ticket.feature.name,
+                          content: (
+                            <>
+                              <span
+                                className="feature-color-swatch"
+                                style={{ backgroundColor: ticket.feature.color }}
+                                aria-hidden
+                              />
+                              <span className="details-menu-label">{ticket.feature.name}</span>
+                            </>
+                          ),
+                        }]
+                      : []),
+                    ...(features ?? []).map((feature) => ({
+                      value: String(feature.id),
+                      label: feature.name,
+                      content: (
+                        <>
+                          <span
+                            className="feature-color-swatch"
+                            style={{ backgroundColor: feature.color }}
+                            aria-hidden
+                          />
+                          <span className="details-menu-label">{feature.name}</span>
+                        </>
+                      ),
+                    })),
+                  ]}
+                />
               </div>
 
               {/* Needs Attention Section */}
