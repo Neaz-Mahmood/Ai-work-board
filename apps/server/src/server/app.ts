@@ -9,16 +9,12 @@ import type { Db } from "./db.ts";
 import { openPglite } from "./db-pglite.ts";
 import { openPostgres } from "./db-postgres.ts";
 import { migrate } from "./migrations.ts";
-import { DomainError } from "./errors.ts";
 import type { Ctx } from "../domain/context.ts";
 import { EventBus } from "../domain/events.ts";
-import { createProjectsRoute } from "./routes/projects.ts";
-import { createTicketsRoute } from "./routes/tickets.ts";
-import { createFeaturesRoute } from "./routes/features.ts";
 import { createEventsRoute } from "./routes/events.ts";
 import { createAuthRoute } from "./routes/auth.ts";
 import { verifySessionCookie, tokenMatches } from "./auth.ts";
-import "./requestActor.ts";
+import { mountApiRoutes } from "./apiRoutes.ts";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { buildMcpServer } from "../mcp/server.ts";
 
@@ -60,13 +56,6 @@ export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx
   const ctx: Ctx = { db, clock, events };
 
   const app = new Hono();
-
-  app.onError((err, c) => {
-    if (err instanceof DomainError) {
-      return c.json({ error: { code: err.code, message: err.message } }, err.status);
-    }
-    return c.json({ error: { code: "INTERNAL", message: err.message || "Internal server error" } }, 500);
-  });
 
   const allowed = new Set(opts.allowedOrigins ?? []);
   const rawCors = cors({
@@ -139,9 +128,7 @@ export async function createApp(opts: AppOptions): Promise<{ app: Hono; ctx: Ctx
 
   app.route("/api/auth", createAuthRoute(ctx, opts.auth, { trustProxy: opts.trustProxy }));
   app.route("/api/events", createEventsRoute(ctx, opts.sseHeartbeatMs));
-  app.route("/api/projects", createProjectsRoute(ctx));
-  app.route("/", createFeaturesRoute(ctx));
-  app.route("/", createTicketsRoute(ctx));
+  mountApiRoutes(app, ctx);
 
   // Mount MCP endpoint over Streamable HTTP in stateless mode.
   // We use the SDK's WebStandardStreamableHTTPServerTransport directly with Hono's

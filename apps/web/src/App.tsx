@@ -16,6 +16,7 @@ import { AddProjectDialog } from "./components/AddProjectDialog.tsx";
 import { ProjectSettingsDialog } from "./components/ProjectSettingsDialog.tsx";
 import { EmptyState } from "./components/EmptyState.tsx";
 import { BoardPage } from "./pages/BoardPage.tsx";
+import { DemoBanner } from "./components/DemoBanner.tsx";
 import "./App.css";
 
 const STORAGE_LAST_PROJECT_KEY = "awb:lastProject";
@@ -125,6 +126,7 @@ function BoardApp() {
       />
 
       <div className="app-main">
+        {import.meta.env.VITE_DEMO && <DemoBanner />}
         <Routes>
           <Route
             path="/"

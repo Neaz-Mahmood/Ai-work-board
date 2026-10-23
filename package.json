@@ -13,6 +13,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "pnpm --filter @awb/web build",
+    "build:demo": "VITE_DEMO=1 pnpm --filter @awb/web exec vite build --mode demo --base /Ai-work-board/",
     "dev": "pnpm --filter @awb/web dev",
     "start": "node apps/server/bin/awb.js start",
     "test:e2e": "pnpm build && VITE_API_URL=http://localhost:4801 pnpm --filter @awb/web exec vite build --outDir ../dist-hosted && playwright test"

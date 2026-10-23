@@ -59,6 +59,32 @@ export function useLiveUpdates(projectKey: string): void {
       }
     };
 
+    const flushPending = () => {
+      for (const serializedKey of pendingQueryKeys) {
+        queryClient.invalidateQueries({ queryKey: JSON.parse(serializedKey) });
+      }
+      pendingQueryKeys.clear();
+    };
+
+    if (import.meta.env.VITE_DEMO) {
+      let unsubscribe: (() => void) | undefined;
+      let cancelled = false;
+      void import("../demo/backend.ts").then(({ subscribeDemoEvents }) => {
+        if (cancelled) return;
+        unsubscribe = subscribeDemoEvents((e) => {
+          if (e.projectKey.toUpperCase() === projectKey.toUpperCase()) {
+            invalidateFor(e.type, e.ticketKey);
+          }
+        });
+      });
+      const unsubscribeDrag = onBoardDragEnd(flushPending);
+      return () => {
+        cancelled = true;
+        unsubscribe?.();
+        unsubscribeDrag();
+      };
+    }
+
     let hasOpened = false;
     const es = new EventSource(
       apiUrl(`/api/events?project=${encodeURIComponent(projectKey)}`),
@@ -93,12 +119,7 @@ export function useLiveUpdates(projectKey: string): void {
       es.addEventListener(type, handleMessage);
     }
 
-    const unsubscribeDrag = onBoardDragEnd(() => {
-      for (const serializedKey of pendingQueryKeys) {
-        queryClient.invalidateQueries({ queryKey: JSON.parse(serializedKey) });
-      }
-      pendingQueryKeys.clear();
-    });
+    const unsubscribeDrag = onBoardDragEnd(flushPending);
 
     return () => {
       unsubscribeDrag();
