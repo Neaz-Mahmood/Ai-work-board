@@ -2,6 +2,8 @@
 
 A Jira-style kanban board for **AI coding agents and the human who steers them**. It runs on your own machine (or a server), and agents such as Claude Code, Cursor or any shell-capable agent read and write it through an **MCP server** or the **`awb` CLI**. You watch, approve and review their work in a **live web UI**.
 
+**[Try the demo](https://neaz-mahmood.github.io/Ai-work-board/)**: the whole app runs in your browser, with no server and no sign-up. See [Browser demo](#browser-demo).
+
 ```
  ┌──────────────┐   MCP (/mcp)   ┌──────────────────────────────┐   REST + SSE   ┌──────────────┐
  │  AI agents   │ ─────────────▶ │  awb server (one process)     │ ◀───────────── │   Web UI     │
@@ -315,6 +317,7 @@ Dockerfile         Backend image for hosted mode
 | `pnpm start` | Start the backend (`node apps/server/bin/awb.js start`). |
 | `pnpm dev` | Start the Vite dev server with hot reload. It proxies `/api` and `/mcp` to `127.0.0.1:4747`, so run `pnpm start` in another terminal. |
 | `pnpm build` | Build the web UI into `apps/web/dist`. |
+| `pnpm build:demo` | Build the in-browser demo into `apps/web/dist-demo` (see [Browser demo](#browser-demo)). |
 | `pnpm test` | Run the backend unit and integration tests (Vitest). |
 | `pnpm typecheck` | Type-check everything (`tsc --noEmit`). |
 | `pnpm test:e2e` | Build, then run the Playwright tests. Run `pnpm exec playwright install chromium` once first. |
@@ -322,6 +325,14 @@ Dockerfile         Backend image for hosted mode
 The backend runs TypeScript directly on Node 26, so server changes only need a restart. Only the web UI has a build step.
 
 ## 12. Hosting
+
+### Browser demo
+
+The [public demo](https://neaz-mahmood.github.io/Ai-work-board/) is a static build with no backend. `pnpm build:demo` bundles the real REST routes (`apps/server/src/server/apiRoutes.ts`) and PGlite into the web app (`apps/web/src/demo/`). The UI's API calls are answered inside the page, and data is stored in the visitor's IndexedDB. Each visitor gets a private board, seeded with a sample project. **Reset demo** restores that project. MCP, the CLI and auth aren't available in the demo.
+
+`.github/workflows/pages.yml` deploys the demo to GitHub Pages on every push to `main`. To enable it once, go to the repo's **Settings → Pages** and set **Source** to **GitHub Actions**. To preview locally, run `pnpm build:demo && pnpm --filter @awb/web exec vite preview --mode demo --base /Ai-work-board/`.
+
+### Self-hosted backend
 
 You can also deploy the board as a **containerized backend** with a **statically hosted frontend**, so agents on other machines can report to it.
 

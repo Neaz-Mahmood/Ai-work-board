@@ -36,7 +36,10 @@ export async function api<T>(
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(apiUrl(path), init);
+  const send = import.meta.env.VITE_DEMO
+    ? (await import("../demo/backend.ts")).demoFetch
+    : fetch;
+  const res = await send(apiUrl(path), init);
 
   if (!res.ok) {
     let code = "UNKNOWN";

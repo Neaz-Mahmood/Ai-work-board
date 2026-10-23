@@ -74,6 +74,9 @@ importers:
       '@awb/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@electric-sql/pglite':
+        specifier: ^0.5.10
+        version: 0.5.10
       '@tanstack/react-query':
         specifier: ^5.104.3
         version: 5.104.3(react@19.3.1)
@@ -107,6 +110,12 @@ importers:
       '@tiptap/starter-kit':
         specifier: 3.32.0
         version: 3.32.0
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       react:
         specifier: ^19.2.0
         version: 19.3.1
@@ -1328,6 +1337,9 @@ packages:
 
   path-to-regexp@8.4.2:
     resolution: {integrity: sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA==}
+
+  pathe@2.0.3:
+    resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -3012,6 +3024,8 @@ snapshots:
   path-key@3.1.1: {}
 
   path-to-regexp@8.4.2: {}
+
+  pathe@2.0.3: {}
 
   picocolors@1.1.1: {}
 

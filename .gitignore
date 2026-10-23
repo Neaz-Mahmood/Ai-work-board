@@ -4,3 +4,4 @@ dist-hosted
 *.log
 test-results
 playwright-report
+dist-demo
